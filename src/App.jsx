@@ -57,7 +57,7 @@ export default function App() {
    * pin editor. Those keep the modal behaviour.
    */
   const isWide = useMediaQuery(SPLIT_VIEW_QUERY);
-  const splitTab = tab === 'list' || tab === 'mine';
+  const splitTab = tab === 'list' || tab === 'mine' || tab === 'map';
   const useSplit = isWide && splitTab;
 
   /*

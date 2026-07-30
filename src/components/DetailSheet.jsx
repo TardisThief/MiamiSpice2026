@@ -15,6 +15,7 @@ import { formatDays, formatDishName, formatPriceRange, priceList } from '../lib/
 import { appleMapsUrl, formatDistance, isIos, nativeMapsUrl } from '../lib/geo.js';
 import { ConfidenceNotice } from './ConfidenceBadge.jsx';
 import { Sheet } from './primitives.jsx';
+import { SplitHandle } from './SplitHandle.jsx';
 import { STATUSES, STATUS_LABELS } from '../lib/storage.js';
 import {
   IconChevronLeft,
@@ -43,6 +44,7 @@ const MEAL_LABEL = { brunch: 'Brunch', lunch: 'Lunch', dinner: 'Dinner' };
  * because each menu repeats the same course names.
  */
 function MenuSection({ record }) {
+  const { selectedMeal } = useStore();
   const menus = record.menus ?? [];
 
   // Fall back to the days table when a restaurant has rows but no parsed menus.
@@ -50,8 +52,21 @@ function MenuSection({ record }) {
 
   const [selected, setSelected] = useState(0);
 
-  // Reset to the first menu when a different restaurant opens in this sheet.
-  useEffect(() => setSelected(0), [record.id]);
+  /*
+   * Open on the meal that was asked for.
+   *
+   * Arriving via a row's "Dinner $65" shortcut should land on the dinner menu, not
+   * on brunch with dinner two taps away. Falls back to the first menu when the
+   * restaurant was opened normally or doesn't serve the requested meal.
+   */
+  useEffect(() => {
+    if (!selectedMeal) {
+      setSelected(0);
+      return;
+    }
+    const i = menus.findIndex((m) => m.meal === selectedMeal);
+    setSelected(i >= 0 ? i : 0);
+  }, [record.id, selectedMeal, menus]);
 
   if (!menus.length) {
     if (!rows.length) {
@@ -436,6 +451,7 @@ export function DetailPane() {
   if (!selected) {
     return (
       <aside className="sidepane sidepane--empty" aria-label="Restaurant detail">
+        <SplitHandle />
         <div className="sidepane__placeholder">
           <IconChevronLeft width={22} height={22} />
           <p>Pick a restaurant to see its menu, prices and location here.</p>
@@ -446,6 +462,7 @@ export function DetailPane() {
 
   return (
     <aside className="sidepane" aria-label={`Detail: ${selected.name}`}>
+      <SplitHandle />
       <header className="sheet__head sidepane__head">
         <h2 className="sheet__title">{selected.name}</h2>
         <CompareHeaderToggle record={selected} />

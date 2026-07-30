@@ -25,10 +25,27 @@ import {
 import { RestaurantRow } from './RestaurantRow.jsx';
 import { Chip, EmptyState, Segmented, SkeletonList } from './primitives.jsx';
 import { FilterSheet } from './FilterSheet.jsx';
-import { IconSearch, IconSliders, IconClose, IconTarget } from './Icons.jsx';
+import {
+  IconCalendar,
+  IconChevronDown,
+  IconClose,
+  IconSearch,
+  IconSliders,
+  IconTarget,
+} from './Icons.jsx';
 import { DAYS } from '../lib/dataset.js';
 
-/** Today's three-letter day code, for the "Tonight" shortcut. */
+const DAY_NAMES = {
+  Mon: 'Monday',
+  Tue: 'Tuesday',
+  Wed: 'Wednesday',
+  Thu: 'Thursday',
+  Fri: 'Friday',
+  Sat: 'Saturday',
+  Sun: 'Sunday',
+};
+
+/** Today's three-letter day code, for the "Today" shortcut. */
 function todayCode() {
   return DAYS[(new Date().getDay() + 6) % 7];
 }
@@ -65,6 +82,9 @@ export function ListView() {
   const priceBuckets = useMemo(() => availablePriceBuckets(restaurants), [restaurants]);
   const activeCount = countActiveFilters(filters);
   const today = todayCode();
+  // A single selected day drives the dropdown; the filter sheet can still select
+  // several, in which case the dropdown reports that rather than lying.
+  const dayValue = filters.days.length === 1 ? filters.days[0] : '';
 
   // Reset scroll when the result set changes, so a new filter starts at the top.
   const resultKey = `${deferredFilters.query}|${activeCount}|${sort}`;
@@ -123,13 +143,38 @@ export function ListView() {
       </header>
 
       <div className="chiprow scroll-x">
-        <Chip
-          active={filters.days.includes(today)}
-          onClick={() => toggle('days', today)}
-          title={`Open ${today}`}
-        >
-          Tonight
-        </Chip>
+        {/*
+          A native <select> rather than a custom menu: seven days is exactly what
+          the platform picker is good at, it opens as a proper wheel on a phone,
+          and it's keyboard- and screen-reader-correct for free.
+        */}
+        <label className={`dayselect ${dayValue ? 'is-active' : ''}`}>
+          <span className="sr-only">Filter by day of the week</span>
+          <IconCalendar className="dayselect__icon" width={15} height={15} />
+          <select
+            className="dayselect__control"
+            value={dayValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              setFilters((f) => ({ ...f, days: v ? [v] : [] }));
+            }}
+          >
+            <option value="">Any day</option>
+            <option value={today}>Today · {today}</option>
+            {DAYS.map((d) => (
+              <option key={d} value={d}>
+                {DAY_NAMES[d]}
+              </option>
+            ))}
+            {filters.days.length > 1 && (
+              <option value="" disabled>
+                {filters.days.length} days selected
+              </option>
+            )}
+          </select>
+          <IconChevronDown className="dayselect__chev" width={14} height={14} />
+        </label>
+
         {MEAL_OPTIONS.map((m) => (
           <Chip key={m.id} active={filters.meals.includes(m.id)} onClick={() => toggle('meals', m.id)}>
             {m.label}

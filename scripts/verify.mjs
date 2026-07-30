@@ -398,8 +398,89 @@ console.log('\ndesktop');
   await wp.waitForTimeout(400);
   check('row compare button fills the tray', (await wp.locator('.tab__badge').textContent()) === '1');
 
+  // The split handle is a real control, not decoration.
+  const beforeW = (await wp.locator('.sidepane').boundingBox()).width;
+  const handle = await wp.locator('.splith').boundingBox();
+  await wp.mouse.move(handle.x + 5, handle.y + 300);
+  await wp.mouse.down();
+  await wp.mouse.move(handle.x - 120, handle.y + 300, { steps: 10 });
+  await wp.mouse.up();
+  await wp.waitForTimeout(500);
+  const afterW = (await wp.locator('.sidepane').boundingBox()).width;
+  check('the divider resizes the detail pane', afterW > beforeW + 60, `${Math.round(beforeW)} -> ${Math.round(afterW)}`);
+
+  const storedWidth = await wp.evaluate(
+    () => JSON.parse(localStorage.getItem('msn.prefs.v1') ?? '{}').sidepaneWidth ?? null,
+  );
+  check('the chosen width is remembered', Number.isFinite(storedWidth), `${storedWidth}px`);
+
+  // Map gets the same treatment, and selecting pans the map to the pin.
+  await wp.locator('.tab', { has: wp.locator('.tab__label', { hasText: /^Map$/ }) }).click();
+  await wp.waitForTimeout(3000);
+  check('map shows the detail pane too', (await wp.locator('.leaflet-container').count()) === 1 && (await wp.locator('.sidepane').count()) === 1);
+
+  await wp.locator('.tab', { has: wp.locator('.tab__label', { hasText: /^List$/ }) }).click();
+  await wp.waitForTimeout(400);
+  await wp.getByLabel('Search restaurants').fill('Komodo');
+  await wp.waitForTimeout(600);
+  await wp.locator('.pane:not([hidden]) .row').first().click();
+  await wp.waitForTimeout(600);
+  await wp.locator('.tab', { has: wp.locator('.tab__label', { hasText: /^Map$/ }) }).click();
+  await wp.waitForTimeout(3000);
+  check('the selected pin is highlighted on the map', (await wp.locator('.mk--selected').count()) === 1);
+  check('no peek card on desktop, the pane serves instead', (await wp.locator('.peek').count()) === 0);
+
   check('no page errors on desktop', pageErrors.length === 0, pageErrors[0] ?? '');
   await wide.close();
+}
+
+/* -------------------------------------------------- row and map shortcuts */
+
+console.log('\nshortcuts');
+{
+  const ctx2 = await browser.newContext({
+    viewport: { width: 412, height: 892 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const sp = await ctx2.newPage();
+  const errs = [];
+  sp.on('pageerror', (e) => errs.push(e.message));
+
+  await sp.goto(BASE, { waitUntil: 'networkidle' });
+  await sp.waitForSelector('.row', { timeout: 20000 });
+
+  check('rows carry meal shortcuts', (await sp.locator('.rowwrap .mealbtn').count()) > 100);
+
+  // A meal shortcut must land on that meal's menu, not the first one.
+  const target = sp.locator('.rowwrap', { has: sp.locator('.mealbtn') }).first();
+  const mealBtn = target.locator('.mealbtn').last();
+  const wanted = (await mealBtn.getAttribute('aria-label')).match(/Open the (\w+) menu/)[1];
+  await mealBtn.click();
+  await sp.waitForTimeout(800);
+  const activeTab = await sp
+    .locator('.sheet[open] .mealtab.is-active .mealtab__meal')
+    .textContent()
+    .catch(() => null);
+  check(
+    'a meal shortcut opens that meal',
+    activeTab == null || activeTab.trim().toLowerCase() === wanted,
+    `wanted ${wanted}, got ${activeTab ?? 'single-menu restaurant'}`,
+  );
+  await sp.keyboard.press('Escape');
+  await sp.waitForTimeout(400);
+
+  // Day dropdown narrows the list.
+  const total = Number((await sp.locator('.listbar__count').textContent()).split(' ')[0]);
+  await sp.selectOption('.dayselect__control', 'Tue');
+  await sp.waitForTimeout(700);
+  const tue = Number((await sp.locator('.listbar__count').textContent()).split(' ')[0]);
+  check('the day dropdown filters the list', tue > 0 && tue < total, `${total} -> ${tue} on Tuesday`);
+  await sp.selectOption('.dayselect__control', '');
+  await sp.waitForTimeout(500);
+
+  check('no page errors', errs.length === 0, errs[0] ?? '');
+  await ctx2.close();
 }
 
 /* -------------------------------------------------------------------- done */

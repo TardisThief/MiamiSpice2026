@@ -30,6 +30,62 @@ function StatusPip({ status }) {
   );
 }
 
+const MEAL_SHORT = { brunch: 'B', lunch: 'L', dinner: 'D' };
+const MEAL_FULL = { brunch: 'Brunch', lunch: 'Lunch', dinner: 'Dinner' };
+const MEAL_ORDER = ['brunch', 'lunch', 'dinner'];
+
+/**
+ * Jump straight to one meal's menu.
+ *
+ * The common question isn't "tell me about this restaurant", it's "what's the
+ * dinner here, and what does it cost" — so the meals a place serves become
+ * direct entry points rather than something to hunt for after opening it.
+ *
+ * The price is the label because it's the deciding number and it's compact. The
+ * meal is carried by a single letter on a phone, where there is no room for more,
+ * and spelled out from tablet width up; both always have a full accessible name.
+ */
+function RowMealButtons({ record, onOpen }) {
+  // One entry per meal at its lowest price — a row is not the place to expose
+  // that a restaurant runs both a $50 and a $65 dinner.
+  const meals = [];
+  for (const meal of MEAL_ORDER) {
+    const forMeal = (record.menus ?? []).filter((m) => m.meal === meal);
+    if (!forMeal.length) continue;
+    const prices = forMeal.map((m) => m.price).filter((p) => Number.isFinite(p));
+    meals.push({ meal, price: prices.length ? Math.min(...prices) : null });
+  }
+
+  if (!meals.length) return null;
+
+  return (
+    <div className="rowwrap__meals">
+      {meals.map(({ meal, price }) => (
+        <button
+          key={meal}
+          type="button"
+          className="mealbtn"
+          title={`${MEAL_FULL[meal]}${price != null ? ` $${price}` : ''} — open this menu`}
+          aria-label={`Open the ${MEAL_FULL[meal].toLowerCase()} menu for ${record.name}${
+            price != null ? `, $${price}` : ''
+          }`}
+          onClick={() => onOpen(record.id, meal)}
+        >
+          <span className="mealbtn__meal">
+            <span className="mealbtn__short" aria-hidden="true">
+              {MEAL_SHORT[meal]}
+            </span>
+            <span className="mealbtn__full" aria-hidden="true">
+              {MEAL_FULL[meal]}
+            </span>
+          </span>
+          {price != null && <span className="mealbtn__price num">${price}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Add/remove without opening the restaurant — the point of putting it here. */
 function RowCompareButton({ record }) {
   const { isInCompare, toggleCompare } = useStore();
@@ -116,9 +172,20 @@ export const RestaurantRow = memo(function RestaurantRow({
             <ConfidenceBadge tier={record.geo_confidence} compact />
           </div>
         </div>
-
-        <IconChevronRight className="row__chev" width={18} height={18} />
       </button>
+
+      {/*
+        Meal shortcuts and the compare toggle sit on opposite sides of the chevron.
+        The chevron moved out of the row button and became decorative: it only ever
+        signalled "this row opens", and the row itself is still the tap target, so
+        it doesn't need to be interactive — and keeping it inside would have forced
+        these buttons to nest inside a button.
+      */}
+      <RowMealButtons record={record} onOpen={onOpen} />
+
+      <span className="rowwrap__chev" aria-hidden="true">
+        <IconChevronRight width={18} height={18} />
+      </span>
 
       {showCompare && <RowCompareButton record={record} />}
     </div>

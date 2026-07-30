@@ -208,6 +208,7 @@ const DEFAULT_PREFS = {
   lastTab: 'list',
   manualLocation: null,
   seenIntro: false,
+  sidepaneWidth: null,
 };
 
 export function loadPrefs() {

@@ -46,6 +46,8 @@ export function StoreProvider({ children }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sort, setSort] = useState('name');
   const [selectedId, setSelectedId] = useState(null);
+  // Which meal the detail should open on, when it was reached via a meal shortcut.
+  const [selectedMeal, setSelectedMeal] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Bumped whenever user-owned storage changes, to re-run the merge.
@@ -421,8 +423,15 @@ export function StoreProvider({ children }) {
     [updatePrefs, showToast],
   );
 
-  const openDetail = useCallback((id) => setSelectedId(id ? String(id) : null), []);
-  const closeDetail = useCallback(() => setSelectedId(null), []);
+  const openDetail = useCallback((id, meal = null) => {
+    setSelectedId(id ? String(id) : null);
+    setSelectedMeal(meal);
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setSelectedId(null);
+    setSelectedMeal(null);
+  }, []);
 
   const resetFilters = useCallback(() => setFilters(EMPTY_FILTERS), []);
 
@@ -439,6 +448,7 @@ export function StoreProvider({ children }) {
     goToTab,
     selected,
     selectedId,
+    selectedMeal,
     openDetail,
     closeDetail,
     // filtering
