@@ -54,6 +54,14 @@ export default defineConfig({
         // a growing roster could silently cross the line and break offline use.
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         navigateFallback: 'index.html',
+        /*
+         * Never let the SPA fallback stand in for data or assets. A navigation
+         * fallback that answers `/data/restaurants.json` with index.html produces
+         * exactly the "Unexpected token '<'" failure this app hit during the
+         * domain switchover — and it fails in a way that looks like corrupt data
+         * rather than a routing mistake.
+         */
+        navigateFallbackDenylist: [/^\/data\//, /^\/assets\//, /^\/brand\//, /\.[a-z0-9]+$/i],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {

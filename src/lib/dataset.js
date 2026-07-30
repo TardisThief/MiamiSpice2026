@@ -124,21 +124,78 @@ export function mergeDataset(dataset) {
   };
 }
 
-/**
- * Fetch the dataset. Served from the same origin so the service worker can cache
- * it for offline use.
- */
-export async function fetchDataset(signal) {
-  const url = `${import.meta.env.BASE_URL}data/restaurants.json`;
-  const res = await fetch(url, { signal });
+/** An HTML body where JSON was expected means a 404 page or a stale cache entry. */
+function looksLikeHtml(text) {
+  return /^\s*<(!doctype|html)/i.test(text);
+}
+
+async function readDataset(url, init) {
+  const res = await fetch(url, init);
   if (!res.ok) {
-    throw new Error(`Could not load the restaurant list (HTTP ${res.status}).`);
+    const err = new Error(`Could not load the restaurant list (HTTP ${res.status}).`);
+    err.status = res.status;
+    throw err;
   }
-  const json = await res.json();
+
+  // Read as text first: a cached HTML page would otherwise fail as an opaque
+  // "Unexpected token '<'" that tells the user nothing about what to do.
+  const text = await res.text();
+  if (looksLikeHtml(text)) {
+    const err = new Error('Received a web page instead of the restaurant data.');
+    err.wasHtml = true;
+    throw err;
+  }
+
+  const json = JSON.parse(text);
   if (!json?.restaurants?.length) {
     throw new Error('The restaurant list loaded but was empty.');
   }
   return json;
+}
+
+/**
+ * Fetch the dataset, healing a poisoned cache.
+ *
+ * The failure this guards against is real and was hit in practice: during a domain
+ * switchover the host briefly answered `/data/restaurants.json` with an HTML 404
+ * page, the service worker cached that, and the app then failed on every load with
+ * "Unexpected token '<'" — permanently, until the user knew to clear site data.
+ * Nobody knows to clear site data.
+ *
+ * So a bad body triggers one retry that bypasses the service worker entirely, and
+ * on success the stale entry is evicted and the worker told to update. A transient
+ * deploy glitch becomes a hiccup rather than a brick.
+ */
+export async function fetchDataset(signal) {
+  const url = `${import.meta.env.BASE_URL}data/restaurants.json`;
+
+  try {
+    return await readDataset(url, { signal });
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+
+    // Only worth retrying when the response was wrong rather than absent.
+    const worthRetry = e.wasHtml || e instanceof SyntaxError;
+    if (!worthRetry) throw e;
+
+    console.warn('[dataset] cached response was not JSON; bypassing the cache', e);
+
+    try {
+      await caches?.keys?.().then((names) =>
+        Promise.all(names.map((n) => caches.open(n).then((c) => c.delete(url, { ignoreSearch: true })))),
+      );
+    } catch {
+      /* Cache API unavailable (private mode); the reload below still helps. */
+    }
+
+    const json = await readDataset(url, { signal, cache: 'reload' });
+
+    // Let the worker re-precache from the network now that we know it's serving
+    // something stale.
+    navigator.serviceWorker?.getRegistration?.().then((reg) => reg?.update?.());
+
+    return json;
+  }
 }
 
 /* --------------------------------------------------------------- formatting */
