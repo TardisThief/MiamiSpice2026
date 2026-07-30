@@ -356,6 +356,88 @@ test('an unparseable price stays null rather than being invented', () => {
   assert.deepEqual(folded.days_offered.dinner, ['Mon']);
 });
 
+test('recommendation prefers a set that shares a night over the top-scoring four', async () => {
+  const { recommendForCompare, sharedSlots } = await import('../src/lib/compare.js');
+
+  // Four "best" candidates by raw score that share nothing, plus a coherent set.
+  const mk = (name, days, extra = {}) => ({
+    id: name,
+    name,
+    menus: [{ meal: 'dinner', price: 50, days, courses: [{ name: 'Appetizers', items: [{ name: 'x' }] }] }],
+    meals: [],
+    geo_confidence: 'poi_match',
+    price_tiers: { dinner: 50 },
+    ...extra,
+  });
+
+  const candidates = [
+    // High score (very close) but each open a different single night.
+    mk('Near A', ['Mon'], { distance: 100, distanceTrusted: true }),
+    mk('Near B', ['Tue'], { distance: 200, distanceTrusted: true }),
+    mk('Near C', ['Wed'], { distance: 300, distanceTrusted: true }),
+    mk('Near D', ['Fri'], { distance: 400, distanceTrusted: true }),
+    // Slightly further, but all four share Thursday.
+    mk('Set A', ['Thu'], { distance: 900, distanceTrusted: true }),
+    mk('Set B', ['Thu'], { distance: 1000, distanceTrusted: true }),
+    mk('Set C', ['Thu'], { distance: 1100, distanceTrusted: true }),
+    mk('Set D', ['Thu'], { distance: 1200, distanceTrusted: true }),
+  ];
+
+  const { picks, shared } = recommendForCompare(candidates, { lat: 25.78, lng: -80.13 });
+
+  assert.equal(picks.length, 4);
+  assert.ok(shared.length > 0, 'the chosen four must share at least one slot');
+  assert.deepEqual(
+    picks.map((p) => p.name).sort(),
+    ['Set A', 'Set B', 'Set C', 'Set D'],
+    'the coherent set wins over four closer but mutually incompatible places',
+  );
+  assert.deepEqual(sharedSlots(picks).map((s) => `${s.day} ${s.meal}`), ['Thu dinner']);
+});
+
+test('recommendation avoids places we cannot place or price', async () => {
+  const { recommendForCompare } = await import('../src/lib/compare.js');
+
+  const good = (n) => ({
+    id: `g${n}`,
+    name: `Good ${n}`,
+    menus: [{ meal: 'dinner', price: 50, days: ['Thu'], courses: [{ name: 'A', items: [{ name: 'x' }] }] }],
+    meals: [],
+    geo_confidence: 'address_exact',
+    price_tiers: { dinner: 50 },
+  });
+  const unplaceable = {
+    id: 'bad',
+    name: 'Unplaceable',
+    menus: [],
+    meals: [],
+    geo_confidence: 'neighborhood_only',
+    price_tiers: {},
+  };
+
+  const { picks } = recommendForCompare([unplaceable, good(1), good(2), good(3), good(4)], null);
+  assert.equal(picks.length, 4);
+  assert.ok(
+    !picks.some((p) => p.id === 'bad'),
+    'a record with no pin, no price and no menu should lose to any real one',
+  );
+});
+
+test('recommendation returns what it can when there are fewer than four matches', async () => {
+  const { recommendForCompare } = await import('../src/lib/compare.js');
+  const two = [1, 2].map((n) => ({
+    id: `r${n}`,
+    name: `R${n}`,
+    menus: [{ meal: 'dinner', price: 50, days: ['Thu'], courses: [] }],
+    meals: [],
+    geo_confidence: 'address_exact',
+    price_tiers: { dinner: 50 },
+  }));
+  const { picks, consideredCount } = recommendForCompare(two, null);
+  assert.equal(picks.length, 2);
+  assert.equal(consideredCount, 2);
+});
+
 /* --------------------------------------------------------------- dish names */
 
 test('shouty dish names are title-cased, deliberate casing is left alone', async () => {

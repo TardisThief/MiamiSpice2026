@@ -209,7 +209,7 @@ for (const q of ['Reunion', 'Hereford', 'Komodo']) {
   await vis(page, '.row').first().click();
   await page.waitForTimeout(600);
   picked.push((await page.locator('.sheet[open] .sheet__title').textContent()).trim());
-  await page.locator('.sheet[open] .cmptoggle .btn').first().click();
+  await page.locator('.sheet[open] .cmpbtn').click();
   await page.waitForTimeout(250);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(350);

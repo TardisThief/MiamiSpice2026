@@ -9,7 +9,7 @@
  * Kept free of React so it can be reasoned about and tested on its own.
  */
 
-import { DAYS } from './dataset.js';
+import { DAYS, priceList } from './dataset.js';
 
 /** Comparing more than four columns doesn't fit a phone. */
 export const MAX_COMPARE = 4;
@@ -179,6 +179,103 @@ export function alignMenus(records, meal) {
   }));
 
   return { courses, perRecord };
+}
+
+/**
+ * Score a single candidate for "would this be useful to compare?".
+ *
+ * Deliberately not a quality ranking — there are no ratings in this data and
+ * inventing one would be dishonest. It ranks USEFULNESS FOR A DECISION: can we
+ * find it, do we know what it costs, is it close.
+ */
+function candidateScore(record, origin) {
+  let score = 0;
+
+  // A pin we can't place is a bad thing to send you toward.
+  const confidence = {
+    verified: 30,
+    poi_match: 25,
+    address_exact: 20,
+    approximate: 8,
+    neighborhood_only: 0,
+    unknown: -10,
+  };
+  score += confidence[record.geo_confidence] ?? 0;
+
+  // Comparing is pointless without something to compare.
+  if (record.menus?.length) score += 20;
+  if (priceList(record).length) score += 10;
+
+  // Distance dominates when we know where you are: 0 km scores 40, 8 km scores 0.
+  if (origin && record.distance != null && record.distanceTrusted) {
+    score += Math.max(0, 40 - (record.distance / 1000) * 5);
+  }
+
+  // A tiny nudge toward places you've already flagged as interesting.
+  if (record.status && record.status !== 'none') score += 6;
+
+  return score;
+}
+
+/**
+ * Pick a set of restaurants worth comparing.
+ *
+ * The naive version — take the top N by score — often returns four places with no
+ * night in common, which is useless for the question Compare exists to answer. So
+ * this scores candidates, keeps a shortlist of the best, then searches that
+ * shortlist for the SUBSET whose shared availability is greatest, breaking ties on
+ * score. With a 16-candidate shortlist that's at most 1,820 combinations, which is
+ * nothing, and it means the suggestion is a group you can actually all go to.
+ *
+ * @param {Array} candidates  Already filtered and distance-annotated.
+ * @param {object|null} origin
+ * @param {object} [opts]
+ * @returns {{picks: Array, shared: Array, consideredCount: number}}
+ */
+export function recommendForCompare(candidates, origin, { size = MAX_COMPARE, shortlist = 16 } = {}) {
+  const ranked = [...candidates]
+    .map((r) => ({ r, score: candidateScore(r, origin) }))
+    .sort((a, b) => b.score - a.score || a.r.name.localeCompare(b.r.name, 'en'));
+
+  const pool = ranked.slice(0, Math.max(shortlist, size)).map((x) => x.r);
+  const scoreOf = new Map(ranked.map((x) => [x.r.id, x.score]));
+
+  if (pool.length <= size) {
+    return { picks: pool, shared: sharedSlots(pool), consideredCount: candidates.length };
+  }
+
+  const slotSets = new Map(pool.map((r) => [r.id, slotsFor(r)]));
+
+  let best = null;
+  const combo = [];
+
+  const walk = (start) => {
+    if (combo.length === size) {
+      // Intersect the chosen sets.
+      let shared = null;
+      for (const r of combo) {
+        const s = slotSets.get(r.id);
+        shared = shared === null ? new Set(s) : new Set([...shared].filter((k) => s.has(k)));
+        if (!shared.size) break;
+      }
+      const sharedCount = shared ? shared.size : 0;
+      const total = combo.reduce((n, r) => n + (scoreOf.get(r.id) ?? 0), 0);
+      if (!best || sharedCount > best.sharedCount || (sharedCount === best.sharedCount && total > best.total)) {
+        best = { picks: [...combo], sharedCount, total };
+      }
+      return;
+    }
+    for (let i = start; i < pool.length; i++) {
+      combo.push(pool[i]);
+      walk(i + 1);
+      combo.pop();
+    }
+  };
+
+  walk(0);
+
+  const picks = best?.picks ?? pool.slice(0, size);
+  return { picks, shared: sharedSlots(picks), consideredCount: candidates.length };
 }
 
 /** Human phrasing for the shared-availability headline. */

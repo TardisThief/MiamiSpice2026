@@ -1720,6 +1720,52 @@
 
 /* ============================================================== compare === */
 
+.empty__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  width: 100%;
+  max-width: 17rem;
+}
+
+.cmp__why {
+  margin: 0 var(--s-4) var(--s-2);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  line-height: var(--lh-snug);
+}
+
+.fsec__hint--lead {
+  padding-top: var(--s-3);
+}
+
+.cmpbtn.is-active {
+  background: var(--primary-soft);
+  color: var(--primary-soft-ink);
+}
+
+.cmpline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  background: var(--primary-soft);
+  color: var(--primary-soft-ink);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.cmpline__btn {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  font-size: var(--t-sm);
+  padding: 4px 0;
+}
+
 .cmp__actions {
   display: flex;
   gap: 6px;

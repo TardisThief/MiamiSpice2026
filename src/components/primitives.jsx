@@ -34,7 +34,7 @@ export function Chip({ active = false, onClick, children, count, tone = 'default
  * platform rather than from hand-rolled listeners — and so it can never be clipped
  * by an ancestor's overflow.
  */
-export function Sheet({ open, onClose, title, children, footer, labelledBy }) {
+export function Sheet({ open, onClose, title, children, footer, labelledBy, actions }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -70,6 +70,9 @@ export function Sheet({ open, onClose, title, children, footer, labelledBy }) {
             <h2 id={labelledBy} className="sheet__title">
               {title}
             </h2>
+            {/* Header actions sit beside the close button so the primary controls
+                for a sheet are all in one place, at the top. */}
+            {actions}
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
               <IconClose />
             </button>

@@ -31,6 +31,7 @@ import { DAYS, formatDays, formatDishName, formatPriceRange, priceList } from '.
 import { formatDistance, nativeMapsUrl } from '../lib/geo.js';
 import { ConfidenceBadge } from './ConfidenceBadge.jsx';
 import { Chip, EmptyState, Sheet } from './primitives.jsx';
+import { FilterSheet } from './FilterSheet.jsx';
 import {
   IconChevronDown,
   IconChevronRight,
@@ -442,10 +443,25 @@ function SaveSheet({ open, onClose }) {
 /* ---------------------------------------------------------------- the view */
 
 export function CompareView() {
-  const { compareRecords, compareIds, clearCompare, toggleCompare, openDetail, origin, goToTab, maxCompare } =
-    useStore();
+  const {
+    compareRecords,
+    compareIds,
+    clearCompare,
+    toggleCompare,
+    openDetail,
+    origin,
+    goToTab,
+    maxCompare,
+    recommend,
+    recommendation,
+  } = useStore();
 
   const [saveOpen, setSaveOpen] = useState(false);
+  const [recommendOpen, setRecommendOpen] = useState(false);
+
+  const runRecommend = () => {
+    if (recommend()) setRecommendOpen(false);
+  };
 
   // IDs can outlive the dataset if a restaurant leaves the roster mid-season.
   const missing = compareIds.length - compareRecords.length;
@@ -461,18 +477,37 @@ export function CompareView() {
             icon={<IconCompare width={26} height={26} />}
             title="Nothing to compare yet"
             action={
-              <button type="button" className="btn btn--primary" onClick={() => goToTab('list')}>
-                Browse restaurants
-              </button>
+              <div className="empty__stack">
+                {/* The quick path: describe what you're after and let it pick. */}
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => setRecommendOpen(true)}
+                >
+                  <IconSpark width={17} height={17} />
+                  Recommend four for me
+                </button>
+                <button type="button" className="btn btn--ghost" onClick={() => goToTab('list')}>
+                  Browse restaurants
+                </button>
+              </div>
             }
           >
             <p>
-              Open a restaurant and tap <strong>Compare</strong>, or add from your saved places.
               Put {maxCompare === 4 ? 'up to four' : `up to ${maxCompare}`} side by side to see
-              which nights they all serve, what each costs, and how the menus stack up.
+              which nights they all serve, what each costs, and how the menus stack up. Add them
+              from a restaurant's <strong>compare</strong> button or from your saved places — or
+              just say what you're in the mood for.
             </p>
           </EmptyState>
         </div>
+
+        <FilterSheet
+          open={recommendOpen}
+          mode="recommend"
+          onConfirm={runRecommend}
+          onClose={() => setRecommendOpen(false)}
+        />
       </div>
     );
   }
@@ -484,6 +519,15 @@ export function CompareView() {
           Compare <span className="topbar__count num">{compareRecords.length}</span>
         </h1>
         <div className="cmp__actions">
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
+            onClick={() => setRecommendOpen(true)}
+            title="Rebuild this comparison from a filter"
+          >
+            <IconSpark width={15} height={15} />
+            Suggest
+          </button>
           {compareRecords.length >= 2 && (
             <button type="button" className="btn btn--sm btn--ghost" onClick={() => setSaveOpen(true)}>
               Save
@@ -522,6 +566,16 @@ export function CompareView() {
           ))}
         </div>
 
+        {/* Say how these were chosen, so four names don't arrive unexplained. */}
+        {recommendation && recommendation.pickedCount === compareRecords.length && (
+          <p className="cmp__why">
+            Picked {recommendation.pickedCount} of {recommendation.consideredCount} matches
+            {recommendation.hadOrigin ? ', nearest first' : ''}, favouring places we can place and
+            price
+            {recommendation.shared.length ? ' that share a night' : ''}.
+          </p>
+        )}
+
         {compareRecords.length === 1 ? (
           <p className="cmp__hint">Add one more to start comparing.</p>
         ) : (
@@ -545,6 +599,13 @@ export function CompareView() {
       </div>
 
       <SaveSheet open={saveOpen} onClose={() => setSaveOpen(false)} />
+
+      <FilterSheet
+        open={recommendOpen}
+        mode="recommend"
+        onConfirm={runRecommend}
+        onClose={() => setRecommendOpen(false)}
+      />
     </div>
   );
 }

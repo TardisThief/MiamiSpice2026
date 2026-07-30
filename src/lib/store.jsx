@@ -8,7 +8,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchDataset, mergeDataset } from './dataset.js';
-import { EMPTY_FILTERS } from './filters.js';
+import { applyFilters, EMPTY_FILTERS } from './filters.js';
 import {
   clearOverride,
   deleteCompareSet,
@@ -24,6 +24,7 @@ import {
   savePrefs,
   saveUserEntry,
 } from './storage.js';
+import { recommendForCompare } from './compare.js';
 import { useGeolocation } from './useGeolocation.js';
 import { haversineMeters } from './geo.js';
 
@@ -236,6 +237,25 @@ export function StoreProvider({ children }) {
     savePrefs({ lastTab: next });
   }, []);
 
+  /**
+   * The origin used for distance maths: a live fix when we have one, otherwise the
+   * manually-set location. Live always wins so a stale manual pin can't quietly
+   * override a real fix.
+   *
+   * Declared here, above the compare tray, because `recommend` lists it as a hook
+   * dependency and dependency arrays are evaluated during render — a `const`
+   * declared further down would be in its temporal dead zone and throw.
+   */
+  const origin = useMemo(() => {
+    if (geo.position) {
+      return { lat: geo.position.lat, lng: geo.position.lng, source: 'device' };
+    }
+    if (prefs.manualLocation) {
+      return { ...prefs.manualLocation, source: 'manual' };
+    }
+    return null;
+  }, [geo.position, prefs.manualLocation]);
+
   /* ----------------------------------------------------------- compare tray */
 
   const [compareIds, setCompareIds] = useState(() => loadCompare());
@@ -281,7 +301,48 @@ export function StoreProvider({ children }) {
   const clearCompare = useCallback(() => {
     const res = saveCompare([]);
     if (res.ok) setCompareIds([]);
+    setRecommendation(null);
   }, []);
+
+  /**
+   * Fill the tray from the current filters — the "quick lookup of what I need"
+   * path. Keeps a summary of how the picks were chosen so the Compare screen can
+   * say what it did rather than presenting four names out of nowhere.
+   */
+  const [recommendation, setRecommendation] = useState(null);
+
+  const recommend = useCallback(() => {
+    const matches = applyFilters(
+      restaurants,
+      filters,
+      sort,
+      origin,
+      prefs.includeUnknownInDistance,
+    );
+    const { picks, shared, consideredCount } = recommendForCompare(matches, origin);
+
+    if (picks.length < 2) {
+      showToast('Not enough matches to compare. Try widening the filters.', 'warn');
+      return false;
+    }
+
+    const res = saveCompare(picks.map((p) => String(p.id)));
+    if (!res.ok) {
+      showToast(`Could not build the comparison: ${res.error}`, 'error');
+      return false;
+    }
+
+    setCompareIds(res.ids);
+    setRecommendation({
+      consideredCount,
+      pickedCount: picks.length,
+      shared,
+      hadOrigin: !!origin,
+      at: Date.now(),
+    });
+    goToTab('compare');
+    return true;
+  }, [restaurants, filters, sort, origin, prefs.includeUnknownInDistance, showToast, goToTab]);
 
   const saveComparison = useCallback(
     (name) => {
@@ -360,21 +421,6 @@ export function StoreProvider({ children }) {
     [updatePrefs, showToast],
   );
 
-  /**
-   * The origin used for distance maths: a live fix when we have one, otherwise the
-   * manually-set location. Live always wins so a stale manual pin can't quietly
-   * override a real fix.
-   */
-  const origin = useMemo(() => {
-    if (geo.position) {
-      return { lat: geo.position.lat, lng: geo.position.lng, source: 'device' };
-    }
-    if (prefs.manualLocation) {
-      return { ...prefs.manualLocation, source: 'manual' };
-    }
-    return null;
-  }, [geo.position, prefs.manualLocation]);
-
   const openDetail = useCallback((id) => setSelectedId(id ? String(id) : null), []);
   const closeDetail = useCallback(() => setSelectedId(null), []);
 
@@ -420,6 +466,8 @@ export function StoreProvider({ children }) {
     clearCompare,
     saveComparison,
     loadComparison,
+    recommend,
+    recommendation,
     removeComparison,
     maxCompare: MAX_COMPARE,
     orphans,

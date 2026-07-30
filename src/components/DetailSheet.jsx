@@ -162,44 +162,59 @@ function StatusPicker({ record }) {
 }
 
 /**
- * Add/remove from the comparison tray.
+ * Add/remove from the comparison tray — the header control.
  *
- * Sits with the status picker because deciding "this is a contender" is the same
- * kind of act as marking it want-to-go — you're shortlisting, not navigating.
+ * Lives beside the title and close button because it's a primary action on the
+ * restaurant as a whole, not a property of it. Icon-only: restaurant names run
+ * long ("Atlantikós - The St. Regis Bal Harbour") and a labelled button would
+ * squeeze the title it sits next to.
  */
-function CompareToggle({ record }) {
-  const { isInCompare, toggleCompare, compareIds, maxCompare, goToTab, closeDetail } = useStore();
+function CompareHeaderToggle({ record }) {
+  const { isInCompare, toggleCompare, compareIds, maxCompare } = useStore();
   const inCompare = isInCompare(record.id);
   const full = !inCompare && compareIds.length >= maxCompare;
 
   return (
-    <div className="cmptoggle">
-      <button
-        type="button"
-        className={`btn btn--sm ${inCompare ? 'btn--primary' : 'btn--ghost'}`}
-        onClick={() => toggleCompare(record.id)}
-      >
-        <IconCompare width={16} height={16} />
-        {inCompare ? 'In comparison' : 'Compare'}
-      </button>
+    <button
+      type="button"
+      className={`icon-btn cmpbtn ${inCompare ? 'is-active' : ''}`}
+      aria-pressed={inCompare}
+      title={
+        inCompare
+          ? 'Remove from comparison'
+          : full
+            ? `Comparing ${maxCompare} already — remove one first`
+            : 'Add to comparison'
+      }
+      aria-label={inCompare ? 'Remove from comparison' : 'Add to comparison'}
+      onClick={() => toggleCompare(record.id)}
+    >
+      <IconCompare width={19} height={19} />
+    </button>
+  );
+}
 
-      {inCompare && compareIds.length > 1 && (
+/** Slim status line in the body, shown only once this restaurant is a contender. */
+function CompareStatusLine({ record }) {
+  const { isInCompare, compareIds, maxCompare, goToTab, closeDetail } = useStore();
+  if (!isInCompare(record.id)) return null;
+
+  return (
+    <div className="cmpline">
+      <span>
+        In comparison ({compareIds.length}/{maxCompare})
+      </span>
+      {compareIds.length > 1 && (
         <button
           type="button"
-          className="btn btn--sm btn--ghost"
+          className="cmpline__btn"
           onClick={() => {
             closeDetail();
             goToTab('compare');
           }}
         >
-          View {compareIds.length} side by side
+          View side by side
         </button>
-      )}
-
-      {full && (
-        <span className="cmptoggle__full">
-          Comparing {maxCompare} already — remove one first.
-        </span>
       )}
     </div>
   );
@@ -242,7 +257,13 @@ export function DetailSheet() {
   const mapsUrl = nativeMapsUrl(r.name, r.address);
 
   return (
-    <Sheet open onClose={closeDetail} title={r.name} labelledBy="detail-title">
+    <Sheet
+      open
+      onClose={closeDetail}
+      title={r.name}
+      labelledBy="detail-title"
+      actions={<CompareHeaderToggle record={r} />}
+    >
       <div className="detail">
         <div className="detail__sub">
           <span>{r.neighborhood}</span>
@@ -301,7 +322,7 @@ export function DetailSheet() {
           <h3 className="detail__h">Your list</h3>
           <StatusPicker record={r} />
           <NotesField record={r} />
-          <CompareToggle record={r} />
+          <CompareStatusLine record={r} />
         </section>
 
         <section className="detail__sec">
