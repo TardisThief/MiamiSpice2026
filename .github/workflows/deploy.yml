@@ -43,12 +43,13 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
 
-      # `enablement: true` creates the Pages site on first run, so the repo does
-      # not need Settings > Pages configured by hand beforehand. Without it the
-      # very first deploy fails with "Get Pages site failed".
+      # Requires Pages to be enabled once, by hand:
+      #   Settings > Pages > Source: "GitHub Actions"
+      # `enablement: true` was tried here and cannot work on this repo — the
+      # workflow's GITHUB_TOKEN gets "Resource not accessible by integration" on
+      # the create-a-Pages-site call regardless of the declared `pages: write`
+      # permission. Once Pages exists, this step only reads it and succeeds.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
