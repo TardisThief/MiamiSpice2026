@@ -11,10 +11,42 @@ import { VitePWA } from 'vite-plugin-pwa';
  */
 const base = process.env.BASE_PATH ?? './';
 
+/**
+ * Cloudflare Web Analytics, injected at build time only.
+ *
+ * Kept out of dev deliberately: beacons fired from localhost would land in the
+ * same dashboard as real traffic and quietly inflate it, and a stat you can't
+ * trust is worse than no stat.
+ *
+ * The token is public by design — it identifies the site, not the visitor, and
+ * Cloudflare expects it in page source.
+ */
+function cloudflareAnalytics() {
+  const TOKEN = 'f8ff7db9a9a64ef680f2722057ee12ab';
+  return {
+    name: 'cloudflare-analytics',
+    apply: 'build',
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'script',
+          attrs: {
+            type: 'module',
+            src: 'https://static.cloudflareinsights.com/beacon.min.js',
+            'data-cf-beacon': JSON.stringify({ token: TOKEN }),
+          },
+          injectTo: 'body',
+        },
+      ];
+    },
+  };
+}
+
 export default defineConfig({
   base,
   plugins: [
     react(),
+    cloudflareAnalytics(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png'],

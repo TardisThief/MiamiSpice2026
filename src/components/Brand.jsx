@@ -115,9 +115,23 @@ export function AboutSheet() {
 
         <h3 className="about__h">It's free</h3>
         <p>
-          Free, and staying that way. No accounts, no ads, no analytics, no cookie banner, nothing
-          tracked and nothing sold. Your favorites, notes and corrected pins live on your device
-          and go precisely nowhere. We have no idea who you are, and we like it like that.
+          Free, and staying that way. No accounts, no ads, no cookies, no cookie banner, and
+          nothing sold to anybody. Your favorites, notes and corrected pins live on your device
+          and go precisely nowhere.
+        </p>
+        <p>
+          We do count visits, using{' '}
+          <a
+            href="https://developers.cloudflare.com/web-analytics/"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Cloudflare Web Analytics
+          </a>
+          . It records that a page was looked at — not who looked at it. No cookies, no
+          fingerprinting, no following you around the internet afterwards. It exists purely so we
+          know whether anyone is actually using this thing, which is a surprisingly motivating
+          number to have.
         </p>
 
         <h3 className="about__h">Thank you</h3>
