@@ -14,6 +14,8 @@ import { IconLink } from './Icons.jsx';
 
 const LOGO_SRC = `${import.meta.env.BASE_URL}brand/better-miami-spice.jpg`;
 
+const CONTACT_EMAIL = 'bettermiamispice@gmail.com';
+
 /**
  * @param {'sidebar'|'settings'} [props.placement]
  * @param {boolean} [props.interactive] Render as a button that opens About.
@@ -109,6 +111,18 @@ export function AboutSheet() {
           And to the {restaurants.length || '350+'} <strong>restaurants</strong> who put on Miami
           Spice year after year — you are the reason August and September are the best two months
           to eat in this city. You do the hard part. We just drew the map.
+        </p>
+
+        <h3 className="about__h">Found a problem?</h3>
+        <p>
+          A pin in the ocean, a price that's changed, a restaurant that's quietly dropped out, or
+          a menu that looks nothing like what arrived at your table — we want to hear about it.
+          Corrections are the only feedback that improves the data for everyone else.
+        </p>
+        <p>
+          <a href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Better Miami Spice')}`}>
+            {CONTACT_EMAIL}
+          </a>
         </p>
 
         <h3 className="about__h">The small print</h3>
