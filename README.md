@@ -158,8 +158,20 @@ git remote add origin https://github.com/<you>/<repo>.git
 git push -u origin main
 ```
 
-Then **Settings → Pages → Source: GitHub Actions**. Every push to `main` builds and
-deploys. Site lands at `https://<you>.github.io/<repo>/`.
+Then — and this step cannot be automated — go to
+**Settings → Pages → Build and deployment → Source** and pick **GitHub Actions**.
+
+The workflow's `GITHUB_TOKEN` is refused on the create-a-Pages-site API with
+`Resource not accessible by integration` even with `pages: write` declared, so
+`actions/configure-pages` can only *read* an existing Pages site. Until that dropdown
+is switched, every run fails at that step with `Get Pages site failed` while the build
+itself succeeds. Re-running the workflow won't help; the setting is the fix.
+
+After that, every push to `main` builds and deploys, and the site lands at
+`https://<you>.github.io/<repo>/`.
+
+The workflow passes `BASE_PATH=/<repo>/` so assets, the service-worker scope and the
+manifest all resolve under the project subpath rather than the domain root.
 
 ### Manual publish
 
