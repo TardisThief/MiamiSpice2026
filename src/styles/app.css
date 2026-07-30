@@ -401,7 +401,47 @@
   padding-bottom: var(--s-8);
 }
 
+/*
+ * The row unit: the tappable row plus its compare toggle.
+ *
+ * content-visibility lives here rather than on .row so the browser skips the
+ * whole unit offscreen. The intrinsic size is a scrollbar hint only — unlike
+ * manual windowing, being slightly off costs nothing.
+ */
+.rowwrap {
+  display: flex;
+  align-items: stretch;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 88px;
+}
+
+.rowwrap__cmp {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  flex-shrink: 0;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line);
+  transition: color var(--d-fast) var(--ease), background var(--d-fast) var(--ease);
+}
+
+.rowwrap__cmp.is-active {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.rowwrap__cmp:active {
+  background: var(--surface-2);
+}
+
+/* Which restaurant the side pane is showing, on desktop. */
+.rowwrap.is-selected .row {
+  background: var(--primary-soft);
+}
+
 .row {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--s-2);
@@ -410,13 +450,6 @@
   text-align: left;
   border-bottom: 1px solid var(--line);
   transition: background var(--d-fast) var(--ease);
-  /*
-   * Lets the browser skip layout and paint for offscreen rows, which is what keeps
-   * 350 of them scrolling smoothly. The intrinsic size is a hint for the scrollbar
-   * only — unlike manual windowing, being slightly off costs nothing.
-   */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 88px;
 }
 
 .row:active {
@@ -2227,36 +2260,6 @@
   color: var(--ink-2);
 }
 
-/* ---- saved row with a compare toggle ---- */
-
-.myrow {
-  display: flex;
-  align-items: stretch;
-}
-
-.myrow .row {
-  flex: 1;
-  min-width: 0;
-}
-
-.myrow__cmp {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  flex-shrink: 0;
-  color: var(--ink-3);
-  border-bottom: 1px solid var(--line);
-  transition: color var(--d-fast) var(--ease);
-}
-
-.myrow__cmp.is-active {
-  color: var(--primary);
-}
-
-.myrow__cmp:active {
-  background: var(--surface-2);
-}
-
 /* ---- saved comparisons in My list ---- */
 
 .cmpset {
@@ -2905,6 +2908,74 @@
 
   .recentre {
     bottom: 34px;
+  }
+}
+
+/*
+ * ---- Desktop split view: list and detail side by side ----
+ *
+ * The stage keeps its absolutely-positioned panes; the detail simply reserves a
+ * column on the right and the panes inset to make room. Two independent scroll
+ * regions, and the list stays live so you can walk down candidates and watch the
+ * detail swap without a modal opening and closing each time.
+ */
+@media (min-width: 1100px) {
+  .stage--split .pane {
+    right: var(--sidepane-w);
+  }
+
+  .sidepane {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--sidepane-w);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  .sidepane__head {
+    border-bottom: 1px solid var(--line);
+    padding-block: var(--s-4) var(--s-3);
+  }
+
+  .sidepane__head .sheet__title {
+    font-size: var(--t-lg);
+  }
+
+  .sidepane__body {
+    flex: 1;
+    min-height: 0;
+    padding: 0 var(--s-4) var(--s-6);
+  }
+
+  .sidepane--empty {
+    display: grid;
+    place-items: center;
+    padding: var(--s-6);
+  }
+
+  .sidepane__placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-3);
+    text-align: center;
+    max-width: 22ch;
+    color: var(--ink-2);
+    font-size: var(--t-sm);
+    line-height: var(--lh-snug);
+  }
+
+  .sidepane__placeholder svg {
+    color: var(--ink-3);
+  }
+
+  /* The detail already names the restaurant; the row highlight is the link. */
+  .stage--split .rowwrap.is-selected .row {
+    background: var(--primary-soft);
   }
 }
 

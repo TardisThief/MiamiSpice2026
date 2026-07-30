@@ -352,6 +352,56 @@ check('map view renders offline', (await page.locator('.leaflet-container').coun
 
 await context.setOffline(false);
 
+/* ------------------------------------------------------- desktop split view */
+
+console.log('\ndesktop');
+{
+  const wide = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const wp = await wide.newPage();
+  const pageErrors = [];
+  wp.on('pageerror', (e) => pageErrors.push(e.message));
+
+  await wp.goto(BASE, { waitUntil: 'networkidle' });
+  await wp.waitForSelector('.row', { timeout: 20000 });
+  await wp.waitForTimeout(800);
+
+  const sidebar = await wp.locator('.tabbar').boundingBox();
+  check('nav becomes a left sidebar', sidebar.x === 0 && sidebar.width > 150, `x=${Math.round(sidebar.x)} w=${Math.round(sidebar.width)}`);
+
+  check('every row carries a compare button', (await wp.locator('.rowwrap__cmp').count()) > 300);
+
+  // Selecting shows the detail beside the list, not over it.
+  await wp.locator('.pane:not([hidden]) .row').nth(2).click();
+  await wp.waitForTimeout(800);
+  check(
+    'detail opens beside the list, not as a dialog',
+    (await wp.locator('.sidepane').count()) === 1 && (await wp.locator('.sheet[open]').count()) === 0,
+  );
+  check('the chosen row is marked in the list', (await wp.locator('.rowwrap.is-selected').count()) === 1);
+
+  // Two independent scroll regions.
+  await wp.locator('.sidepane__body').evaluate((e) => e.scrollTo(0, 500));
+  await wp.waitForTimeout(300);
+  const detailTop = await wp.locator('.sidepane__body').evaluate((e) => e.scrollTop);
+  const listTop = await wp.locator('.pane:not([hidden]) .list').evaluate((e) => e.scrollTop);
+  check('list and detail scroll independently', detailTop > 100 && listTop === 0, `detail ${detailTop}, list ${listTop}`);
+
+  // Switching restaurants swaps the pane without a modal cycle.
+  await wp.locator('.pane:not([hidden]) .row').nth(4).click();
+  await wp.waitForTimeout(600);
+  const paneTitle = await wp.locator('.sidepane__head .sheet__title').textContent();
+  const rowName = await wp.locator('.rowwrap.is-selected .row__name').textContent();
+  check('clicking another row swaps the pane', paneTitle.trim() === rowName.trim(), paneTitle.trim());
+
+  // Adding to compare straight from the list.
+  await wp.locator('.rowwrap__cmp').nth(0).click();
+  await wp.waitForTimeout(400);
+  check('row compare button fills the tray', (await wp.locator('.tab__badge').textContent()) === '1');
+
+  check('no page errors on desktop', pageErrors.length === 0, pageErrors[0] ?? '');
+  await wide.close();
+}
+
 /* -------------------------------------------------------------------- done */
 
 await browser.close();

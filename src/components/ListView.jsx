@@ -45,6 +45,7 @@ export function ListView() {
     origin,
     prefs,
     openDetail,
+    selectedId,
     locationEnabled,
     enableLocation,
     geo,
@@ -205,7 +206,13 @@ export function ListView() {
         {loadState === 'ready' &&
           results.length > 0 &&
           results.map((r) => (
-            <RestaurantRow key={r.id} record={r} onOpen={openDetail} showDistance={!!origin} />
+            <RestaurantRow
+              key={r.id}
+              record={r}
+              onOpen={openDetail}
+              showDistance={!!origin}
+              isSelected={String(selectedId) === String(r.id)}
+            />
           ))}
       </div>
 

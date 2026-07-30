@@ -8,13 +8,14 @@
 
 import { useEffect, useState } from 'react';
 import { useStore } from './lib/store.jsx';
+import { SPLIT_VIEW_QUERY, useMediaQuery } from './lib/useMediaQuery.js';
 import { ListView } from './components/ListView.jsx';
 import { MapView } from './components/MapView.jsx';
 import { MyListView } from './components/MyListView.jsx';
 import { CalibrateView } from './components/CalibrateView.jsx';
 import { CompareView } from './components/CompareView.jsx';
 import { SettingsView } from './components/SettingsView.jsx';
-import { DetailSheet } from './components/DetailSheet.jsx';
+import { DetailPane, DetailSheet } from './components/DetailSheet.jsx';
 import { ErrorState, Toast } from './components/primitives.jsx';
 import {
   IconBookmark,
@@ -49,13 +50,26 @@ export default function App() {
   }, [tab]);
 
   /*
+   * Desktop split view: show the detail beside the list rather than over it.
+   *
+   * Only on the screens where it makes sense. Map has its own peek card and needs
+   * its full width; Compare is already a multi-column layout; Calibrate opens a
+   * pin editor. Those keep the modal behaviour.
+   */
+  const isWide = useMediaQuery(SPLIT_VIEW_QUERY);
+  const splitTab = tab === 'list' || tab === 'mine';
+  const useSplit = isWide && splitTab;
+
+  /*
    * Android back closes an open sheet instead of leaving the app.
    *
-   * Keyed on whether a sheet is open, NOT on which restaurant is selected —
-   * otherwise switching from one restaurant to another would tear down and rebuild
-   * the history entry, pushing and popping in the same tick.
+   * Keyed on whether a MODAL sheet is open, not merely on whether something is
+   * selected: in the split view the detail is inline, so hijacking Back there
+   * would trap the user on the page. Also not keyed on the selected restaurant,
+   * or switching between two would tear down and rebuild the history entry in the
+   * same tick.
    */
-  const sheetOpen = !!selected;
+  const sheetOpen = !!selected && !useSplit;
   useEffect(() => {
     if (!sheetOpen) return;
     history.pushState({ sheet: true }, '');
@@ -84,7 +98,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <main className="stage">
+      <main className={`stage ${useSplit ? 'stage--split' : ''}`}>
         {visited.has('list') && (
           <div className="pane" hidden={tab !== 'list'}>
             <ListView />
@@ -115,6 +129,9 @@ export default function App() {
             <SettingsView />
           </div>
         )}
+
+        {/* Desktop only: the detail lives beside the list instead of over it. */}
+        {useSplit && <DetailPane />}
       </main>
 
       <nav className="tabbar" aria-label="Main navigation">
@@ -141,7 +158,7 @@ export default function App() {
 
       {/* The detail sheet belongs to the shell, not a view, so it survives tab
           switches — the Calibrate view opens its own pin editor instead. */}
-      {tab !== 'calibrate' && <DetailSheet />}
+      {tab !== 'calibrate' && !useSplit && <DetailSheet />}
 
       <Toast toast={toast} />
     </div>

@@ -108,6 +108,7 @@
   /* ---- Layout ---- */
   --content-max: 34rem;
   --tabbar-h: 3.75rem;
+  --sidepane-w: 27rem;
 
   color-scheme: light dark;
 }

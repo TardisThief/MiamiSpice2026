@@ -11,7 +11,7 @@ import { useMemo } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { RestaurantRow } from './RestaurantRow.jsx';
 import { EmptyState } from './primitives.jsx';
-import { IconBookmark, IconChevronRight, IconClose, IconCompare } from './Icons.jsx';
+import { IconBookmark, IconChevronRight, IconClose } from './Icons.jsx';
 
 /**
  * Saved comparisons.
@@ -102,37 +102,6 @@ function OrphanNotice() {
   );
 }
 
-/**
- * A saved restaurant with a compare toggle beside it.
- *
- * The toggle sits OUTSIDE the row rather than inside: `RestaurantRow` is itself a
- * button, and nesting a button inside a button is invalid HTML that browsers
- * resolve unpredictably.
- */
-function SavedRow({ record }) {
-  const { openDetail, origin, isInCompare, toggleCompare } = useStore();
-  const inCompare = isInCompare(record.id);
-
-  return (
-    <div className="myrow">
-      <RestaurantRow record={record} onOpen={openDetail} showDistance={!!origin} />
-      <button
-        type="button"
-        className={`myrow__cmp ${inCompare ? 'is-active' : ''}`}
-        aria-pressed={inCompare}
-        aria-label={
-          inCompare
-            ? `Remove ${record.name} from the comparison`
-            : `Add ${record.name} to the comparison`
-        }
-        onClick={() => toggleCompare(record.id)}
-      >
-        <IconCompare width={17} height={17} />
-      </button>
-    </div>
-  );
-}
-
 const GROUPS = [
   { status: 'booked', title: 'Booked', hint: 'You have a table.' },
   { status: 'want_to_go', title: 'Want to go', hint: 'The shortlist.' },
@@ -141,8 +110,7 @@ const GROUPS = [
 ];
 
 export function MyListView() {
-  const { restaurants, openDetail, origin, goToTab, compareSets, orphans, isInCompare, toggleCompare } =
-    useStore();
+  const { restaurants, openDetail, origin, goToTab, compareSets, orphans, selectedId } = useStore();
 
   const grouped = useMemo(() => {
     const map = new Map(GROUPS.map((g) => [g.status, []]));
@@ -207,7 +175,13 @@ export function MyListView() {
                   </header>
                   {g.hint && <p className="group__hint">{g.hint}</p>}
                   {items.map((r) => (
-                    <SavedRow key={r.id} record={r} />
+                    <RestaurantRow
+                      key={r.id}
+                      record={r}
+                      onOpen={openDetail}
+                      showDistance={!!origin}
+                      isSelected={String(selectedId) === String(r.id)}
+                    />
                   ))}
                 </section>
               );
@@ -221,7 +195,13 @@ export function MyListView() {
                 </header>
                 <p className="group__hint">You wrote something but didn't mark a status.</p>
                 {noted.map((r) => (
-                  <SavedRow key={r.id} record={r} />
+                  <RestaurantRow
+                      key={r.id}
+                      record={r}
+                      onOpen={openDetail}
+                      showDistance={!!origin}
+                      isSelected={String(selectedId) === String(r.id)}
+                    />
                 ))}
               </section>
             )}

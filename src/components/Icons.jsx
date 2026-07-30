@@ -90,6 +90,14 @@ export function IconChevronRight(p) {
   );
 }
 
+export function IconChevronLeft(p) {
+  return (
+    <svg {...base} {...p}>
+      <path d="m14.5 5-7 7 7 7" />
+    </svg>
+  );
+}
+
 export function IconChevronDown(p) {
   return (
     <svg {...base} {...p}>

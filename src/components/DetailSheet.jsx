@@ -17,6 +17,8 @@ import { ConfidenceNotice } from './ConfidenceBadge.jsx';
 import { Sheet } from './primitives.jsx';
 import { STATUSES, STATUS_LABELS } from '../lib/storage.js';
 import {
+  IconChevronLeft,
+  IconClose,
   IconCompare,
   IconLink,
   IconNavigate,
@@ -246,24 +248,20 @@ function NotesField({ record }) {
   );
 }
 
-export function DetailSheet() {
-  const { selected, closeDetail, origin, goToTab, openDetail } = useStore();
+/**
+ * The detail content itself, with no opinion about how it is presented.
+ *
+ * Extracted so the same markup can render inside a bottom sheet on a phone and
+ * inside a side pane on a desktop, rather than maintaining two copies that drift.
+ */
+function DetailBody({ record: r }) {
+  const { closeDetail, origin, goToTab, openDetail } = useStore();
 
-  if (!selected) return <Sheet open={false} onClose={closeDetail} />;
-
-  const r = selected;
   const price = formatPriceRange(r);
   const distance = origin && r.distance != null ? formatDistance(r.distance) : null;
   const mapsUrl = nativeMapsUrl(r.name, r.address);
 
   return (
-    <Sheet
-      open
-      onClose={closeDetail}
-      title={r.name}
-      labelledBy="detail-title"
-      actions={<CompareHeaderToggle record={r} />}
-    >
       <div className="detail">
         <div className="detail__sub">
           <span>{r.neighborhood}</span>
@@ -401,6 +399,63 @@ export function DetailSheet() {
           </a>
         </section>
       </div>
+  );
+}
+
+/**
+ * Phone presentation: a bottom sheet over the list.
+ */
+export function DetailSheet() {
+  const { selected, closeDetail } = useStore();
+
+  if (!selected) return <Sheet open={false} onClose={closeDetail} />;
+
+  return (
+    <Sheet
+      open
+      onClose={closeDetail}
+      title={selected.name}
+      labelledBy="detail-title"
+      actions={<CompareHeaderToggle record={selected} />}
+    >
+      <DetailBody record={selected} />
     </Sheet>
+  );
+}
+
+/**
+ * Desktop presentation: a pane beside the list, scrolling independently.
+ *
+ * Not a dialog, deliberately — the list stays live and clickable, so you can walk
+ * down candidates and watch the detail swap without a modal opening and closing
+ * each time. That's the whole point of having the width.
+ */
+export function DetailPane() {
+  const { selected, closeDetail } = useStore();
+
+  if (!selected) {
+    return (
+      <aside className="sidepane sidepane--empty" aria-label="Restaurant detail">
+        <div className="sidepane__placeholder">
+          <IconChevronLeft width={22} height={22} />
+          <p>Pick a restaurant to see its menu, prices and location here.</p>
+        </div>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="sidepane" aria-label={`Detail: ${selected.name}`}>
+      <header className="sheet__head sidepane__head">
+        <h2 className="sheet__title">{selected.name}</h2>
+        <CompareHeaderToggle record={selected} />
+        <button type="button" className="icon-btn" onClick={closeDetail} aria-label="Close detail">
+          <IconClose />
+        </button>
+      </header>
+      <div className="sidepane__body scroll-y">
+        <DetailBody record={selected} />
+      </div>
+    </aside>
   );
 }
