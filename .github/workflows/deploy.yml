@@ -99,12 +99,12 @@ jobs:
 
       - run: npm test
 
-      # BASE_PATH must match the Pages subpath for a project site. The default
-      # relative base also works, but setting it explicitly keeps the service
-      # worker's scope unambiguous.
+      # No BASE_PATH: the build falls back to a RELATIVE base, which works both at
+      # the project subpath (tardisthief.github.io/MiamiSpice2026/) and at the root
+      # of the custom domain (www.bettermiamispice.com). Pinning it to one or the
+      # other would break the site on the other during the DNS switchover, and the
+      # relative build is verified against both.
       - run: npm run build
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}/
 
       # Requires Pages to be enabled once, by hand:
       #   Settings > Pages > Source: "GitHub Actions"

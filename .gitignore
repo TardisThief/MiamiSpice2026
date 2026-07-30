@@ -24,3 +24,4 @@ Thumbs.db
 
 # Local scratch for testing the Pages subpath build
 .pagestest/
+.roottest/
