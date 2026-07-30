@@ -69,6 +69,29 @@ export function AboutSheet() {
       <div className="about">
         <Logo placement="about" />
 
+        {/*
+          The disclaimer, up front and unmissable rather than buried at the bottom.
+          The wordmark deliberately echoes the official one, so saying plainly that
+          this isn't the official thing is the first thing worth saying — and it
+          repeats verbatim in the small print below for anyone who reads that far.
+        */}
+        <aside className="disclaim">
+          <span className="disclaim__label">Small print made bigger</span>
+          <p className="disclaim__text">
+            Not affiliated with, endorsed by, or in any way officially blessed by the GMCVB or the
+            Miami Spice program. We're just enthusiastic.
+          </p>
+          <a
+            className="disclaim__link"
+            href="https://www.miamiandbeaches.com/deals/spice-restaurant-months"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Visit the official Miami Spice site
+            <IconLink width={14} height={14} />
+          </a>
+        </aside>
+
         <p className="about__lede">
           Miami Spice is {restaurants.length || '350+'} restaurants across{' '}
           {meta?.neighborhoods?.length || 35} neighborhoods. The official listing is a very long

@@ -2940,6 +2940,54 @@
 
 /* ---- about ---- */
 
+/*
+ * The not-affiliated notice.
+ *
+ * Prominence comes from centring, weight and a border rather than from the brass
+ * accent, which already means "approximate location" everywhere else in the app —
+ * reusing it here would blur a signal that has to stay unambiguous.
+ */
+.disclaim {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  text-align: center;
+  margin-bottom: var(--s-5);
+  padding: var(--s-4);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.disclaim__label {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.disclaim__text {
+  margin: 0 !important;
+  max-width: 34ch;
+  font-size: var(--t-md) !important;
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  color: var(--ink) !important;
+  text-wrap: balance;
+}
+
+.disclaim__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--primary);
+}
+
 .about p {
   font-size: var(--t-sm);
   line-height: var(--lh-body);
