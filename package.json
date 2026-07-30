@@ -1,0 +1,38 @@
+{
+  "name": "miami-spice-navigator",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Personal PWA for browsing, filtering and mapping Miami Spice 2026 restaurants",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "pipeline": "node pipeline/run.js",
+    "pipeline:directory": "node pipeline/01-directory.js",
+    "pipeline:details": "node pipeline/02-details.js",
+    "pipeline:guides": "node pipeline/03-guides.js",
+    "pipeline:geocode": "node pipeline/04-geocode.js",
+    "pipeline:emit": "node pipeline/05-emit.js",
+    "promote-overrides": "node pipeline/promote-overrides.js",
+    "icons": "node scripts/make-icons.mjs",
+    "deploy": "node scripts/deploy.js",
+    "test": "node --test tests/",
+    "verify": "node scripts/verify.mjs",
+    "audit": "node scripts/audit.mjs",
+    "shoot": "node scripts/shoot.mjs"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "cheerio": "^1.0.0",
+    "playwright-core": "^1.62.0",
+    "vite": "^6.0.7",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}

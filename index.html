@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      viewport-fit=cover so the map can run under the notch, with safe-area insets
+      handled in CSS. maximum-scale is deliberately NOT set: blocking zoom on a
+      restaurant list would be a real accessibility failure.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Miami Spice 2026</title>
+    <meta
+      name="description"
+      content="Browse, filter and map the 350+ restaurants in Miami Spice Restaurant Months 2026."
+    />
+
+    <!-- Matches the light/dark surface so the OS chrome doesn't flash. -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Miami Spice" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <!-- Explicit icon links; without these the browser requests /favicon.ico and 404s. -->
+    <link rel="icon" type="image/png" sizes="64x64" href="./icons/favicon-64.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      This app needs JavaScript to filter and map 350+ restaurants. The official
+      directory is at
+      <a href="https://www.miamiandbeaches.com/deals/spice-restaurant-months/participating-restaurants-at-a-glance">
+        miamiandbeaches.com </a
+      >.
+    </noscript>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

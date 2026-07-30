@@ -1,0 +1,60 @@
+# Build and publish to GitHub Pages.
+#
+# HTTPS is a hard requirement, not a nicety: geolocation and service workers both
+# need a secure context, so the app cannot be meaningfully tested from a phone over
+# http://192.168.x.x. Pages gives HTTPS for free, which is why it's the target.
+#
+# One-time setup in the repo: Settings > Pages > Source = "GitHub Actions".
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Don't let two deploys race; cancel the older one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # BASE_PATH must match the Pages subpath for a project site. The default
+      # relative base also works, but setting it explicitly keeps the service
+      # worker's scope unambiguous.
+      - run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

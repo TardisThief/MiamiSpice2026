@@ -1,0 +1,192 @@
+/*
+ * Design tokens. See DESIGN.md for the reasoning.
+ *
+ * Brand hue is 212 throughout. Surfaces stay near-neutral (chroma <= 0.007) so the
+ * only saturated things on screen are the map and the primary/accent marks.
+ */
+
+:root {
+  /* ---- Brand hue ---- */
+  --hue: 212;
+
+  /* ---- Surfaces (light) ---- */
+  --bg: oklch(1 0 0);
+  --surface: oklch(0.981 0.004 var(--hue));
+  --surface-2: oklch(0.96 0.006 var(--hue));
+  --surface-3: oklch(0.935 0.007 var(--hue));
+
+  /* ---- Hairlines ---- */
+  --line: oklch(0.915 0.006 var(--hue));
+  --line-strong: oklch(0.855 0.008 var(--hue));
+
+  /* ---- Text. ink-2 is verified >=4.5:1 on both bg and surface. ---- */
+  --ink: oklch(0.22 0.014 var(--hue));
+  --ink-2: oklch(0.44 0.014 var(--hue));
+  --ink-3: oklch(0.56 0.012 var(--hue));
+
+  /* ---- Primary ---- */
+  --primary: oklch(0.5 0.1 var(--hue));
+  --primary-hover: oklch(0.44 0.105 var(--hue));
+  --primary-ink: oklch(1 0 0);
+  --primary-soft: oklch(0.955 0.022 var(--hue));
+  --primary-soft-ink: oklch(0.38 0.09 var(--hue));
+  --primary-ring: oklch(0.5 0.1 var(--hue) / 0.32);
+
+  /* ---- Accent: brass. Means "caution / approximate", never decoration.
+         L is 0.545 rather than a prettier 0.58 because 0.58 measured 4.41:1 on
+         white — just under the 4.5 floor. Verified 5.05:1 / 4.79:1 on surface. ---- */
+  --accent: oklch(0.545 0.12 66);
+  --accent-soft: oklch(0.955 0.032 76);
+  --accent-soft-ink: oklch(0.42 0.1 62);
+
+  /* ---- Status vocabulary ---- */
+  --positive: oklch(0.52 0.1 155);
+  --positive-soft: oklch(0.955 0.03 155);
+  --rose: oklch(0.55 0.15 14);
+  --rose-soft: oklch(0.96 0.028 14);
+  --danger: oklch(0.52 0.16 25);
+  --muted-mark: oklch(0.68 0.006 var(--hue));
+
+  /* ---- Type ---- */
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-num: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --t-xs: 0.75rem;
+  --t-sm: 0.8125rem;
+  --t-base: 0.9375rem;
+  --t-md: 1.0625rem;
+  --t-lg: 1.25rem;
+  --t-xl: 1.5rem;
+  --t-2xl: 1.875rem;
+
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
+  --lh-body: 1.55;
+
+  /* ---- Space ---- */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.25rem;
+  --s-6: 1.5rem;
+  --s-8: 2rem;
+  --s-10: 2.5rem;
+  --s-12: 3rem;
+
+  /* ---- Radii: the "soft" carrier ---- */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-full: 999px;
+
+  /* ---- Shadows: low opacity, tinted toward the brand hue ---- */
+  --shadow-sm: 0 1px 2px oklch(0.4 0.03 var(--hue) / 0.06),
+    0 1px 3px oklch(0.4 0.03 var(--hue) / 0.04);
+  --shadow-md: 0 2px 8px oklch(0.4 0.03 var(--hue) / 0.08),
+    0 1px 2px oklch(0.4 0.03 var(--hue) / 0.05);
+  --shadow-lg: 0 -2px 24px oklch(0.35 0.03 var(--hue) / 0.12),
+    0 -1px 4px oklch(0.35 0.03 var(--hue) / 0.06);
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --d-fast: 140ms;
+  --d-base: 190ms;
+  --d-slow: 260ms;
+
+  /* ---- Z scale: semantic, no arbitrary values ---- */
+  --z-map: 0;
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-backdrop: 30;
+  --z-sheet: 40;
+  --z-toast: 50;
+  --z-tooltip: 60;
+
+  /* ---- Layout ---- */
+  --content-max: 34rem;
+  --tabbar-h: 3.75rem;
+
+  color-scheme: light dark;
+}
+
+/*
+ * Dark mode. Follows the OS by default; the in-app theme toggle stamps
+ * data-theme on <html> and must win in both directions.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.188 0.006 var(--hue));
+    --surface-2: oklch(0.232 0.007 var(--hue));
+    --surface-3: oklch(0.275 0.008 var(--hue));
+
+    --line: oklch(0.285 0.008 var(--hue));
+    --line-strong: oklch(0.36 0.01 var(--hue));
+
+    --ink: oklch(0.955 0.004 var(--hue));
+    --ink-2: oklch(0.74 0.01 var(--hue));
+    --ink-3: oklch(0.62 0.01 var(--hue));
+
+    --primary: oklch(0.72 0.1 var(--hue));
+    --primary-hover: oklch(0.78 0.095 var(--hue));
+    --primary-ink: oklch(0.16 0.02 var(--hue));
+    --primary-soft: oklch(0.27 0.038 var(--hue));
+    --primary-soft-ink: oklch(0.84 0.07 var(--hue));
+    --primary-ring: oklch(0.72 0.1 var(--hue) / 0.4);
+
+    --accent: oklch(0.78 0.11 72);
+    --accent-soft: oklch(0.3 0.045 68);
+    --accent-soft-ink: oklch(0.88 0.08 76);
+
+    --positive: oklch(0.72 0.11 155);
+    --positive-soft: oklch(0.28 0.04 155);
+    --rose: oklch(0.72 0.13 14);
+    --rose-soft: oklch(0.3 0.045 14);
+    --danger: oklch(0.7 0.15 25);
+    --muted-mark: oklch(0.52 0.006 var(--hue));
+
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+    --shadow-md: 0 2px 8px oklch(0 0 0 / 0.45);
+    --shadow-lg: 0 -2px 24px oklch(0 0 0 / 0.5);
+  }
+}
+
+/* Explicit dark selection overrides the OS preference. */
+:root[data-theme="dark"] {
+  --bg: oklch(0.145 0 0);
+  --surface: oklch(0.188 0.006 var(--hue));
+  --surface-2: oklch(0.232 0.007 var(--hue));
+  --surface-3: oklch(0.275 0.008 var(--hue));
+
+  --line: oklch(0.285 0.008 var(--hue));
+  --line-strong: oklch(0.36 0.01 var(--hue));
+
+  --ink: oklch(0.955 0.004 var(--hue));
+  --ink-2: oklch(0.74 0.01 var(--hue));
+  --ink-3: oklch(0.62 0.01 var(--hue));
+
+  --primary: oklch(0.72 0.1 var(--hue));
+  --primary-hover: oklch(0.78 0.095 var(--hue));
+  --primary-ink: oklch(0.16 0.02 var(--hue));
+  --primary-soft: oklch(0.27 0.038 var(--hue));
+  --primary-soft-ink: oklch(0.84 0.07 var(--hue));
+  --primary-ring: oklch(0.72 0.1 var(--hue) / 0.4);
+
+  --accent: oklch(0.78 0.11 72);
+  --accent-soft: oklch(0.3 0.045 68);
+  --accent-soft-ink: oklch(0.88 0.08 76);
+
+  --positive: oklch(0.72 0.11 155);
+  --positive-soft: oklch(0.28 0.04 155);
+  --rose: oklch(0.72 0.13 14);
+  --rose-soft: oklch(0.3 0.045 14);
+  --danger: oklch(0.7 0.15 25);
+  --muted-mark: oklch(0.52 0.006 var(--hue));
+
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+  --shadow-md: 0 2px 8px oklch(0 0 0 / 0.45);
+  --shadow-lg: 0 -2px 24px oklch(0 0 0 / 0.5);
+}

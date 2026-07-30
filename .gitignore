@@ -1,0 +1,23 @@
+node_modules/
+dist/
+dev-dist/
+.deploy-worktree/
+
+# Scraped HTML and geocode responses. Regenerable, and ~350 MB of noise in a diff.
+# Delete these locally only if you want to force a full re-fetch.
+pipeline/cache/
+pipeline/geocache/
+
+# Pipeline intermediates and verification artifacts. `public/data/restaurants.json`
+# and `geocode-review.md` are the committed outputs; these are regenerable.
+pipeline/data/
+
+.DS_Store
+Thumbs.db
+*.local
+.env
+.env.*
+!.env.example
+.vscode/*
+!.vscode/extensions.json
+.idea/

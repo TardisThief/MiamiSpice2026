@@ -1,0 +1,129 @@
+/**
+ * App shell: bottom tab bar + the active view.
+ *
+ * Five destinations, bottom-anchored because this is a one-handed phone app. Views
+ * are mounted lazily but kept alive once visited, so returning to the map doesn't
+ * rebuild 350 markers and returning to the list keeps your scroll position.
+ */
+
+import { useEffect, useState } from 'react';
+import { useStore } from './lib/store.jsx';
+import { ListView } from './components/ListView.jsx';
+import { MapView } from './components/MapView.jsx';
+import { MyListView } from './components/MyListView.jsx';
+import { CalibrateView } from './components/CalibrateView.jsx';
+import { SettingsView } from './components/SettingsView.jsx';
+import { DetailSheet } from './components/DetailSheet.jsx';
+import { ErrorState, Toast } from './components/primitives.jsx';
+import {
+  IconBookmark,
+  IconList,
+  IconMap,
+  IconPin,
+  IconSettings,
+} from './components/Icons.jsx';
+
+const TABS = [
+  { id: 'list', label: 'List', Icon: IconList },
+  { id: 'map', label: 'Map', Icon: IconMap },
+  { id: 'mine', label: 'My list', Icon: IconBookmark },
+  { id: 'calibrate', label: 'Calibrate', Icon: IconPin },
+  { id: 'settings', label: 'Settings', Icon: IconSettings },
+];
+
+export default function App() {
+  const { tab, goToTab, loadState, loadError, reload, toast, selected, closeDetail } = useStore();
+
+  // Keep visited tabs mounted so their state (scroll, map, markers) survives.
+  const [visited, setVisited] = useState(() => new Set([tab]));
+  useEffect(() => {
+    setVisited((v) => (v.has(tab) ? v : new Set(v).add(tab)));
+  }, [tab]);
+
+  /*
+   * Android back closes an open sheet instead of leaving the app.
+   *
+   * Keyed on whether a sheet is open, NOT on which restaurant is selected —
+   * otherwise switching from one restaurant to another would tear down and rebuild
+   * the history entry, pushing and popping in the same tick.
+   */
+  const sheetOpen = !!selected;
+  useEffect(() => {
+    if (!sheetOpen) return;
+    history.pushState({ sheet: true }, '');
+    const onPop = () => closeDetail();
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      // Only unwind our own entry, and only if it's still the current one.
+      if (history.state?.sheet) history.back();
+    };
+  }, [sheetOpen, closeDetail]);
+
+  if (loadState === 'error') {
+    return (
+      <div className="app">
+        <main className="stage">
+          <ErrorState
+            title="Couldn't load the restaurant list"
+            message={`${loadError} If you're offline and haven't opened the app before, connect once so it can cache the data.`}
+            onRetry={reload}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <main className="stage">
+        {visited.has('list') && (
+          <div className="pane" hidden={tab !== 'list'}>
+            <ListView />
+          </div>
+        )}
+        {visited.has('map') && (
+          <div className="pane" hidden={tab !== 'map'}>
+            <MapView />
+          </div>
+        )}
+        {visited.has('mine') && (
+          <div className="pane" hidden={tab !== 'mine'}>
+            <MyListView />
+          </div>
+        )}
+        {visited.has('calibrate') && (
+          <div className="pane" hidden={tab !== 'calibrate'}>
+            <CalibrateView />
+          </div>
+        )}
+        {visited.has('settings') && (
+          <div className="pane" hidden={tab !== 'settings'}>
+            <SettingsView />
+          </div>
+        )}
+      </main>
+
+      <nav className="tabbar" aria-label="Main navigation">
+        {TABS.map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            type="button"
+            className={`tab ${tab === id ? 'is-active' : ''}`}
+            aria-current={tab === id ? 'page' : undefined}
+            onClick={() => goToTab(id)}
+          >
+            <Icon width={21} height={21} />
+            <span className="tab__label">{label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* The detail sheet belongs to the shell, not a view, so it survives tab
+          switches — the Calibrate view opens its own pin editor instead. */}
+      {tab !== 'calibrate' && <DetailSheet />}
+
+      <Toast toast={toast} />
+    </div>
+  );
+}
