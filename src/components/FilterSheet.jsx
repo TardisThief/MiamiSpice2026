@@ -9,9 +9,9 @@
 import { useMemo } from 'react';
 import { useStore } from '../lib/store.jsx';
 import {
+  availablePriceBuckets,
   countActiveFilters,
   MEAL_OPTIONS,
-  PRICE_BUCKETS,
   neighborhoodOptions,
 } from '../lib/filters.js';
 import { Chip, Sheet } from './primitives.jsx';
@@ -26,6 +26,7 @@ export function FilterSheet({ open, onClose }) {
   const { restaurants, filters, setFilters, resetFilters } = useStore();
 
   const hoods = useMemo(() => neighborhoodOptions(restaurants), [restaurants]);
+  const priceBuckets = useMemo(() => availablePriceBuckets(restaurants), [restaurants]);
   const activeCount = countActiveFilters(filters);
 
   const toggle = (key, value) =>
@@ -73,7 +74,7 @@ export function FilterSheet({ open, onClose }) {
       <section className="fsec">
         <h3 className="fsec__title">Price</h3>
         <div className="fsec__chips">
-          {PRICE_BUCKETS.map((b) => (
+          {priceBuckets.map((b) => (
             <Chip
               key={b.id}
               active={filters.priceTiers.includes(b.id)}

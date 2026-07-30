@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { formatDays, formatPriceRange, priceList } from '../lib/dataset.js';
+import { formatDays, formatDishName, formatPriceRange, priceList } from '../lib/dataset.js';
 import { appleMapsUrl, formatDistance, isIos, nativeMapsUrl } from '../lib/geo.js';
 import { ConfidenceNotice } from './ConfidenceBadge.jsx';
 import { Sheet } from './primitives.jsx';
@@ -20,35 +20,115 @@ import { IconLink, IconNavigate, IconPhone, IconSpark, IconPin } from './Icons.j
 
 const MEAL_LABEL = { brunch: 'Brunch', lunch: 'Lunch', dinner: 'Dinner' };
 
-function MealTable({ record }) {
-  const meals = (record.meals ?? []).filter((m) => m.days?.length || m.price != null);
+/**
+ * The menu section.
+ *
+ * Most restaurants here serve several genuinely different menus — 204 of 351 —
+ * and they differ in food, price AND which days they run. Reunion Ktchn Bar's
+ * $50 dinner is Mon–Thu and Sunday while its $65 dinner is nightly, which is
+ * exactly the kind of thing that decides where you eat tonight.
+ *
+ * So the meal is a switch rather than a list: pick Brunch / Lunch / Dinner and the
+ * price, days and courses below all belong to that choice. Showing every menu
+ * stacked was the old behaviour and it read as one endless duplicate-looking list,
+ * because each menu repeats the same course names.
+ */
+function MenuSection({ record }) {
+  const menus = record.menus ?? [];
 
-  if (!meals.length) {
-    const days = formatDays(record.editorial_days_hint);
+  // Fall back to the days table when a restaurant has rows but no parsed menus.
+  const rows = (record.meals ?? []).filter((m) => m.days?.length || m.price != null);
+
+  const [selected, setSelected] = useState(0);
+
+  // Reset to the first menu when a different restaurant opens in this sheet.
+  useEffect(() => setSelected(0), [record.id]);
+
+  if (!menus.length) {
+    if (!rows.length) {
+      const days = formatDays(record.editorial_days_hint);
+      return (
+        <div className="unconfirmed">
+          <strong>Details unconfirmed</strong>
+          <p>
+            We couldn't find the price or days for this one on any source.
+            {days ? ` An editorial guide mentions ${days}, unattributed to a meal.` : ''} Check with
+            the restaurant before you go.
+          </p>
+        </div>
+      );
+    }
+    // Prices and days are known even though the dishes weren't published.
     return (
-      <div className="unconfirmed">
-        <strong>Details unconfirmed</strong>
-        <p>
-          We couldn't find the price or days for this one on any source.
-          {days ? ` An editorial guide mentions ${days}, unattributed to a meal.` : ''} Check with the
-          restaurant before you go.
-        </p>
-      </div>
+      <>
+        <div className="mealtable">
+          {rows.map((m, i) => (
+            <div className="mealtable__row" key={i}>
+              <span className="mealtable__meal">
+                {m.meal ? MEAL_LABEL[m.meal] : m.label}
+                {m.reserve && <span className="tag tag--reserve tag--sm">Reserve</span>}
+              </span>
+              <span className="mealtable__price num">
+                {m.price != null ? `$${m.price}` : m.label}
+              </span>
+              <span className="mealtable__days">{formatDays(m.days) ?? '—'}</span>
+            </div>
+          ))}
+        </div>
+        <p className="detail__fine">No dishes published for this one yet.</p>
+      </>
     );
   }
 
+  const active = menus[Math.min(selected, menus.length - 1)];
+
   return (
-    <div className="mealtable">
-      {meals.map((m, i) => (
-        <div className="mealtable__row" key={i}>
-          <span className="mealtable__meal">
-            {m.meal ? MEAL_LABEL[m.meal] : m.label}
-            {m.reserve && <span className="tag tag--reserve tag--sm">Reserve</span>}
+    <div className="menusec">
+      {menus.length > 1 && (
+        <div className="mealtabs scroll-x" role="tablist" aria-label="Menu">
+          {menus.map((m, i) => (
+            <button
+              key={`${m.meal}-${m.price}`}
+              type="button"
+              role="tab"
+              aria-selected={i === selected}
+              className={`mealtab ${i === selected ? 'is-active' : ''}`}
+              onClick={() => setSelected(i)}
+            >
+              <span className="mealtab__meal">{MEAL_LABEL[m.meal] ?? m.meal}</span>
+              {m.price != null && <span className="mealtab__price num">${m.price}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="menuhead">
+        <div className="menuhead__main">
+          <span className="menuhead__meal">
+            {MEAL_LABEL[active.meal] ?? active.meal}
+            {active.reserve && <span className="tag tag--reserve tag--sm">Reserve</span>}
           </span>
-          <span className="mealtable__price num">
-            {m.price != null ? `$${m.price}` : m.prices_seen?.length ? m.label : '—'}
+          <span className="menuhead__days">
+            {active.days ? formatDays(active.days) : 'Days not published'}
           </span>
-          <span className="mealtable__days">{formatDays(m.days) ?? '—'}</span>
+        </div>
+        {active.price != null && <span className="menuhead__price num">${active.price}</span>}
+      </div>
+
+      {active.courses.map((course, i) => (
+        <div className="course" key={`${active.meal}-${active.price}-${i}`}>
+          <div className="course__head">
+            {course.name && <h4 className="course__name">{course.name}</h4>}
+            {course.note && <span className="course__note">{course.note}</span>}
+          </div>
+          <ul className="course__items">
+            {course.items.map((item, j) => (
+              <li className="dish" key={j}>
+                <span className="dish__name">{formatDishName(item.name)}</span>
+                {item.description && <span className="dish__desc">{item.description}</span>}
+              </li>
+            ))}
+          </ul>
         </div>
       ))}
     </div>
@@ -149,11 +229,21 @@ export function DetailSheet() {
           <h3 className="detail__h">
             Miami Spice menu {price && <span className="detail__h-price num">{price}</span>}
           </h3>
-          <MealTable record={r} />
+          <MenuSection record={r} />
+          {r.editorial_pick && (
+            <p className="detail__pick">
+              <strong>Editor's pick:</strong> {r.editorial_pick}
+            </p>
+          )}
           {r.editorial_when_offered && (
             <p className="detail__quote">“{r.editorial_when_offered}”</p>
           )}
           {r.menu_notes && <p className="detail__fine">{r.menu_notes}</p>}
+          {r.menus?.length > 0 && (
+            <p className="detail__fine">
+              Menus are a snapshot from {r.last_scraped} and change through the season.
+            </p>
+          )}
         </section>
 
         <section className="detail__sec">
@@ -212,30 +302,6 @@ export function DetailSheet() {
             {r.geo_confidence === 'verified' ? 'Adjust this pin' : 'Fix this pin'}
           </button>
         </section>
-
-        {r.menu_groups?.length > 0 && (
-          <section className="detail__sec">
-            <h3 className="detail__h">On the menu</h3>
-            {r.editorial_pick && (
-              <p className="detail__pick">
-                <strong>Editor's pick:</strong> {r.editorial_pick}
-              </p>
-            )}
-            {r.menu_groups.map((g, i) => (
-              <div className="course" key={i}>
-                {g.group && <h4 className="course__name">{g.group}</h4>}
-                <ul className="course__items">
-                  {g.items.map((item, j) => (
-                    <li key={j}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-            <p className="detail__fine">
-              Menus are a snapshot from {r.last_scraped} and change through the season.
-            </p>
-          </section>
-        )}
 
         {r.description && (
           <section className="detail__sec">

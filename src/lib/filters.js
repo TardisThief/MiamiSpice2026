@@ -171,6 +171,21 @@ export function applyFilters(
   }
 }
 
+/**
+ * Only the price buckets that actually match something.
+ *
+ * The season's advertised tiers include Reserve at $95+, but no restaurant
+ * publishes a $90+ price in its participating-days table — Reserve experiences are
+ * listed without one. A chip that can never return a result is noise, so buckets
+ * are derived from the data rather than hard-coded. If a $95 menu appears later in
+ * the season, the chip comes back on its own.
+ */
+export function availablePriceBuckets(restaurants) {
+  const prices = new Set();
+  for (const r of restaurants) for (const p of priceList(r)) prices.add(p);
+  return PRICE_BUCKETS.filter((b) => [...prices].some((p) => b.test(p)));
+}
+
 /** Neighborhoods present in the data, with counts, for the filter sheet. */
 export function neighborhoodOptions(restaurants) {
   const counts = new Map();

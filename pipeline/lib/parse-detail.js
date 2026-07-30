@@ -129,6 +129,92 @@ export function parseTemptationTables($) {
 }
 
 /**
+ * Parse the per-meal menus.
+ *
+ * A restaurant usually offers SEVERAL different menus — 204 of the 351 have more
+ * than one — and they are genuinely different food, not one menu with a different
+ * price. The page models this as Bootstrap tab panes: an outer `#nav-{meal}` pane
+ * per meal, containing one `#{meal}-{price}menu` pane per price variant. Reunion
+ * Ktchn Bar, for instance, has brunch-40, lunch-40, dinner-50 AND dinner-65.
+ *
+ * Keying off the `{meal}-{price}menu` id rather than the tab nav is deliberate:
+ * the id carries both facts, and single-meal restaurants (Komodo) render no nav at
+ * all. That pattern holds for all 616 menu panes across the corpus.
+ *
+ * @returns {Array<{meal: string, price: number|null, courses: Array}>}
+ */
+export function parseMenus($) {
+  const menus = [];
+
+  $('.tab-pane[id]').each((_, pane) => {
+    const $pane = $(pane);
+    const id = $pane.attr('id') || '';
+    const m = id.match(/^([a-z]+)-(\d+)menu$/i);
+    if (!m) return;
+
+    const meal = m[1].toLowerCase();
+    const price = Number(m[2]);
+
+    const courses = [];
+    $pane.find('.ys-partner-details__tabs__container__info__temptation__group').each((__, group) => {
+      const $g = $(group);
+      const name = clean(
+        $g.find('.ys-partner-details__tabs__container__info__temptation__group__name').first().text(),
+      );
+      // "Choose 1 of the following" — part of how the prix fixe actually works,
+      // so it belongs with the course rather than being dropped.
+      const note = clean(
+        $g
+          .find('.ys-partner-details__tabs__container__info__temptation__group__description')
+          .first()
+          .text(),
+      );
+
+      const items = [];
+      $g.find('.ys-partner-details__tabs__container__info__temptation__group__items__item').each(
+        (___, item) => {
+          const $i = $(item);
+          const itemName = clean($i.find('.item-name').first().text());
+          const itemDesc = clean($i.find('.item-description').first().text());
+          // Fall back to the whole item's text when the sub-elements are absent.
+          const fallback = clean($i.text());
+          if (!itemName && !fallback) return;
+          items.push({
+            name: itemName || fallback,
+            description: itemName && itemDesc ? itemDesc : null,
+          });
+        },
+      );
+
+      if (name || items.length) courses.push({ name: name || null, note: note || null, items });
+    });
+
+    if (courses.length) menus.push({ meal, price, courses });
+  });
+
+  // Brunch, lunch, then dinner — the order you'd eat them in.
+  const order = { brunch: 0, lunch: 1, dinner: 2 };
+  return menus.sort(
+    (a, b) => (order[a.meal] ?? 9) - (order[b.meal] ?? 9) || (a.price ?? 0) - (b.price ?? 0),
+  );
+}
+
+/**
+ * Attach each menu's serving days by joining to the participating-days table on
+ * (meal, price) — the table labels its rows "Dinner $50", "Dinner $65", which is
+ * exactly the key the pane ids encode.
+ */
+function attachDaysToMenus(menus, meals) {
+  for (const menu of menus) {
+    const row = meals.find((m) => m.meal === menu.meal && m.price === menu.price);
+    menu.days = row?.days?.length ? row.days : null;
+    menu.reserve = row?.reserve ?? false;
+    menu.label = row?.label ?? null;
+  }
+  return menus;
+}
+
+/**
  * Fold parsed meal rows into the spec's price_tiers / days_offered shape.
  * Nulls are preserved; nothing is inferred.
  */
@@ -210,18 +296,8 @@ export function parseDetail(html) {
     clean($('.ys-partner-details__tabs__container__info__temptation__disclaimer').first().text()) ||
     null;
 
-  // Menu course groups, kept as a snapshot (spec: menus are point-in-time).
-  const menuGroups = [];
-  $('.ys-partner-details__tabs__container__info__temptation__group').each((_, g) => {
-    const $g = $(g);
-    const groupName = clean($g.find('.ys-partner-details__tabs__container__info__temptation__group__name').first().text());
-    const items = [];
-    $g.find('.ys-partner-details__tabs__container__info__temptation__group__items__item').each((__, it) => {
-      const text = clean($(it).text());
-      if (text) items.push(text);
-    });
-    if (groupName || items.length) menuGroups.push({ group: groupName || null, items });
-  });
+  // Menus, one per meal + price variant, kept as a point-in-time snapshot.
+  const menus = attachDaysToMenus(parseMenus($), meals);
 
   return {
     jsonld_name: clean(business?.name) || null,
@@ -240,7 +316,7 @@ export function parseDetail(html) {
     price_tiers,
     days_offered,
     menu_notes: disclaimer,
-    menu_groups: menuGroups,
+    menus,
     has_spice_menu: meals.length > 0,
   };
 }

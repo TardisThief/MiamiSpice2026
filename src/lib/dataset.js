@@ -186,10 +186,24 @@ export function formatDays(days) {
     .join(', ');
 }
 
-/** All prices a restaurant offers, lowest first. */
+/**
+ * Every distinct price a restaurant offers, lowest first.
+ *
+ * `price_tiers` holds at most one price per bucket, which loses real variants:
+ * Reunion Ktchn Bar serves a $50 AND a $65 dinner, so reading tiers alone showed
+ * "$40–$50" and — worse — excluded it from the $65 filter. The menus and the
+ * participating-days rows both enumerate every variant, so they take precedence
+ * and tiers act as the fallback for records that have neither.
+ */
 export function priceList(r) {
+  const fromMenus = (r.menus ?? []).map((m) => m.price);
+  const fromMeals = (r.meals ?? []).map((m) => m.price);
   const t = r.price_tiers ?? {};
-  return [t.lunch_brunch, t.dinner, t.reserve].filter((p) => Number.isFinite(p)).sort((a, b) => a - b);
+  const fromTiers = [t.lunch_brunch, t.dinner, t.reserve];
+
+  return [...new Set([...fromMenus, ...fromMeals, ...fromTiers].filter((p) => Number.isFinite(p)))].sort(
+    (a, b) => a - b,
+  );
 }
 
 export function formatPriceRange(r) {
@@ -211,6 +225,51 @@ export function allDays(r) {
   const set = new Set([...(d.lunch_brunch ?? []), ...(d.dinner ?? [])]);
   if (!set.size && r.editorial_days_hint) for (const day of r.editorial_days_hint) set.add(day);
   return DAY_ORDER.filter((day) => set.has(day));
+}
+
+/**
+ * Words that stay lowercase inside a title, unless they lead it.
+ * Includes the Spanish/French/Italian particles that show up constantly on
+ * Miami menus.
+ */
+const SMALL_WORDS = new Set([
+  'a', 'an', 'and', 'the', 'or', 'of', 'with', 'in', 'on', 'for', 'to', 'at',
+  'by', 'from', 'over', 'under', 'w', 'de', 'del', 'la', 'las', 'el', 'los',
+  'y', 'con', 'al', 'le', 'les', 'du', 'des', 'et', 'à', 'di', 'da', 'e', 'alla',
+]);
+
+/**
+ * Normalise a dish name for display.
+ *
+ * The source mixes conventions freely — "SMOKED SALMON EGG BENNEDICTS" sits right
+ * next to "Feta Phyllo Fingers" — and rendering both verbatim looks like a bug.
+ * CSS can't fix it: `text-transform: capitalize` only uppercases first letters and
+ * leaves existing capitals shouting.
+ *
+ * Only obviously-shouty names are rewritten. Anything already in mixed case is
+ * left exactly as written, because the restaurant's own capitalisation of
+ * something like "wagyu NY strip" is more likely right than our guess.
+ */
+export function formatDishName(name) {
+  if (!name) return '';
+  const letters = name.replace(/[^A-Za-z]/g, '');
+  if (letters.length < 2) return name;
+
+  const upperCount = (name.match(/[A-Z]/g) ?? []).length;
+  if (upperCount / letters.length < 0.7) return name;
+
+  return name
+    .toLowerCase()
+    .split(/(\s+|[-/])/)
+    .map((token, i) => {
+      if (/^(\s+|[-/])$/.test(token)) return token;
+      // Keep unit-ish tokens intact: 6oz, 1/2, 10.
+      if (/\d/.test(token)) return token;
+      const bare = token.replace(/[^a-zà-ÿ]/gi, '');
+      if (i > 0 && SMALL_WORDS.has(bare)) return token;
+      return token.replace(/[a-zà-ÿ]/i, (c) => c.toUpperCase());
+    })
+    .join('');
 }
 
 /** Which meals are offered, derived from the parsed meal rows. */

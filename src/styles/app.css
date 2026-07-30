@@ -1011,16 +1011,115 @@
   margin-bottom: var(--s-3);
 }
 
-.course {
+/* ---- meal switcher ---- */
+
+.mealtabs {
+  display: flex;
+  gap: 6px;
   margin-bottom: var(--s-3);
+}
+
+.mealtab {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 7px 13px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  color: var(--ink-2);
+  transition:
+    background var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease),
+    border-color var(--d-fast) var(--ease);
+}
+
+.mealtab.is-active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-soft-ink);
+}
+
+.mealtab__meal {
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.mealtab__price {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+/* ---- selected menu header ---- */
+
+.menuhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  margin-bottom: var(--s-4);
+}
+
+.menuhead__main {
+  min-width: 0;
+}
+
+.menuhead__meal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-base);
+  font-weight: 600;
+}
+
+.menuhead__days {
+  display: block;
+  margin-top: 1px;
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+}
+
+.menuhead__price {
+  font-size: var(--t-lg);
+  font-weight: 700;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* ---- courses ---- */
+
+.course {
+  margin-bottom: var(--s-4);
+}
+
+.course__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
 }
 
 .course__name {
   font-size: var(--t-xs);
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--ink-2);
-  margin-bottom: 4px;
+}
+
+.course__note {
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  font-style: italic;
 }
 
 .course__items {
@@ -1028,9 +1127,25 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 7px;
+}
+
+.dish {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dish__name {
   font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dish__desc {
+  font-size: var(--t-xs);
   color: var(--ink-2);
+  line-height: var(--lh-snug);
 }
 
 /* ========================================================= status picker === */

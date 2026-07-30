@@ -356,6 +356,82 @@ test('an unparseable price stays null rather than being invented', () => {
   assert.deepEqual(folded.days_offered.dinner, ['Mon']);
 });
 
+/* --------------------------------------------------------------- dish names */
+
+test('shouty dish names are title-cased, deliberate casing is left alone', async () => {
+  const { formatDishName } = await import('../src/lib/dataset.js');
+
+  // The source mixes conventions within a single restaurant.
+  assert.equal(formatDishName('SMOKED SALMON EGG BENNEDICTS'), 'Smoked Salmon Egg Bennedicts');
+  assert.equal(formatDishName('WATERCRESS CESAR SALAD'), 'Watercress Cesar Salad');
+
+  // Already mixed case: the restaurant's own capitalisation wins.
+  assert.equal(formatDishName('Feta Phyllo Fingers'), 'Feta Phyllo Fingers');
+  assert.equal(formatDishName('wagyu NY strip'), 'wagyu NY strip');
+  // Komodo styles its whole menu lowercase on purpose.
+  assert.equal(formatDishName('salmon tacos'), 'salmon tacos');
+
+  // Spanish and French particles stay lowercase inside a title.
+  assert.equal(formatDishName('CHURRASCO DE RES CON CHIMICHURRI'), 'Churrasco de Res con Chimichurri');
+  assert.equal(formatDishName('ARROZ CON POLLO A LA PLANCHA'), 'Arroz con Pollo a la Plancha');
+
+  // Measurements and surcharges survive intact.
+  assert.equal(formatDishName('1/2 MAINE LOBSTER'), '1/2 Maine Lobster');
+  assert.equal(formatDishName('SKIRT STEAK (+$12)'), 'Skirt Steak (+$12)');
+
+  assert.equal(formatDishName(''), '');
+  assert.equal(formatDishName(null), '');
+});
+
+/* ------------------------------------------------------------------- menus */
+
+test('menus are parsed per meal and price variant, with days joined on', async () => {
+  const { parseMenus } = await import('../pipeline/lib/parse-detail.js');
+  const cheerio = await import('cheerio');
+
+  // Two dinner price variants nested inside one meal pane, as the source does it.
+  const html = `
+    <div class="tab-content">
+      <div class="tab-pane" id="nav-dinner">
+        <div class="tab-pane" id="dinner-50menu">
+          <div class="ys-partner-details__tabs__container__info__temptation__group">
+            <p class="ys-partner-details__tabs__container__info__temptation__group__name">Appetizers</p>
+            <p class="ys-partner-details__tabs__container__info__temptation__group__description">Choose 1</p>
+            <div class="ys-partner-details__tabs__container__info__temptation__group__items">
+              <div class="ys-partner-details__tabs__container__info__temptation__group__items__item">
+                <p class="item-name">SOUP</p><p class="item-description">of the day</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-pane" id="dinner-65menu">
+          <div class="ys-partner-details__tabs__container__info__temptation__group">
+            <p class="ys-partner-details__tabs__container__info__temptation__group__name">Appetizers</p>
+            <div class="ys-partner-details__tabs__container__info__temptation__group__items">
+              <div class="ys-partner-details__tabs__container__info__temptation__group__items__item">
+                <p class="item-name">OYSTERS</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const menus = parseMenus(cheerio.load(html));
+  assert.equal(menus.length, 2, 'both price variants become separate menus');
+  assert.deepEqual(
+    menus.map((m) => `${m.meal}-${m.price}`),
+    ['dinner-50', 'dinner-65'],
+  );
+  // Each variant keeps only its own dishes — no bleed from the sibling pane.
+  assert.equal(menus[0].courses[0].items.length, 1);
+  assert.equal(menus[0].courses[0].items[0].name, 'SOUP');
+  assert.equal(menus[0].courses[0].items[0].description, 'of the day');
+  assert.equal(menus[0].courses[0].note, 'Choose 1');
+  assert.equal(menus[1].courses[0].items[0].name, 'OYSTERS');
+  assert.equal(menus[1].courses[0].items[0].description, null);
+});
+
 /* ------------------------------------------------------------------ geometry */
 
 test('haversine matches a known Miami distance', () => {

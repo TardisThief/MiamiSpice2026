@@ -15,7 +15,13 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { applyFilters, countActiveFilters, MEAL_OPTIONS, PRICE_BUCKETS, SORTS } from '../lib/filters.js';
+import {
+  applyFilters,
+  availablePriceBuckets,
+  countActiveFilters,
+  MEAL_OPTIONS,
+  SORTS,
+} from '../lib/filters.js';
 import { RestaurantRow } from './RestaurantRow.jsx';
 import { Chip, EmptyState, Segmented, SkeletonList } from './primitives.jsx';
 import { FilterSheet } from './FilterSheet.jsx';
@@ -55,6 +61,7 @@ export function ListView() {
     [restaurants, deferredFilters, sort, origin, prefs.includeUnknownInDistance],
   );
 
+  const priceBuckets = useMemo(() => availablePriceBuckets(restaurants), [restaurants]);
   const activeCount = countActiveFilters(filters);
   const today = todayCode();
 
@@ -128,7 +135,7 @@ export function ListView() {
           </Chip>
         ))}
         <span className="chiprow__sep" aria-hidden="true" />
-        {PRICE_BUCKETS.map((b) => (
+        {priceBuckets.map((b) => (
           <Chip
             key={b.id}
             active={filters.priceTiers.includes(b.id)}

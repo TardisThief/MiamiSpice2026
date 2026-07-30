@@ -75,7 +75,8 @@ function toPublicRecord(r) {
     days_offered: d.days_offered ?? { lunch_brunch: null, dinner: null },
     meals: d.meals ?? [],
     menu_notes: d.menu_notes ?? null,
-    menu_groups: d.menu_groups ?? [],
+    // One entry per meal + price variant, each with its own days and courses.
+    menus: d.menus ?? [],
     description: d.description ?? null,
     editorial_when_offered: r.editorial_when_offered ?? null,
     editorial_pick: r.editorial_pick ?? null,
