@@ -81,7 +81,12 @@ const closeSheets = async (page) => {
  */
 const tap = async (page, label) => {
   await closeSheets(page);
-  await page.locator('.tab', { hasText: new RegExp(`^${label}$`) }).first().click();
+  // Matched via .tab__label, not the tab's own text: the Compare tab also renders
+  // a count badge, so the button's textContent is "3Compare".
+  await page
+    .locator('.tab', { has: page.locator('.tab__label', { hasText: new RegExp(`^${label}$`) }) })
+    .first()
+    .click();
   await page.waitForTimeout(450);
 };
 
@@ -171,9 +176,12 @@ const tap = async (page, label) => {
   await page.waitForTimeout(500);
   await shot(page, '09-mylist');
 
-  // Calibrate
-  await tap(page, 'Calibrate');
-  await page.waitForTimeout(600);
+  // Calibrate now lives behind Settings rather than in the tab bar.
+  await tap(page, 'Settings');
+  await page.waitForTimeout(400);
+  await shot(page, '09b-settings');
+  await page.locator('.navrow').first().click();
+  await page.waitForTimeout(700);
   await shot(page, '10-calibrate');
 
   await closeSheets(page);
@@ -190,9 +198,9 @@ const tap = async (page, label) => {
   await closeSheets(page);
   await page.waitForTimeout(300);
 
-  // Settings
-  await tap(page, 'Settings');
-  await page.waitForTimeout(400);
+  // Back out of Calibrate to Settings
+  await page.locator('.backbtn').click();
+  await page.waitForTimeout(500);
   await shot(page, '13-settings');
 
   await context.close();
@@ -217,12 +225,14 @@ const tap = async (page, label) => {
   await page.waitForTimeout(3500);
   await shot(page, '22-map-dark');
 
-  await tap(page, 'Calibrate');
-  await page.waitForTimeout(600);
-  await shot(page, '23-calibrate-dark');
-
   await tap(page, 'Settings');
   await page.waitForTimeout(400);
+  await page.locator('.navrow').first().click();
+  await page.waitForTimeout(700);
+  await shot(page, '23-calibrate-dark');
+
+  await page.locator('.backbtn').click();
+  await page.waitForTimeout(500);
   await shot(page, '24-settings-dark');
 
   await context.close();

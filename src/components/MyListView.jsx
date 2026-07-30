@@ -11,7 +11,127 @@ import { useMemo } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { RestaurantRow } from './RestaurantRow.jsx';
 import { EmptyState } from './primitives.jsx';
-import { IconBookmark } from './Icons.jsx';
+import { IconBookmark, IconChevronRight, IconClose, IconCompare } from './Icons.jsx';
+
+/**
+ * Saved comparisons.
+ *
+ * Sits above the status groups because a named shortlist ("Anniversary") is a
+ * decision already in progress, where a status group is just a bucket.
+ */
+function SavedComparisons() {
+  const { compareSets, byId, loadComparison, removeComparison } = useStore();
+  const sets = Object.values(compareSets).sort(
+    (a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? '') || a.name.localeCompare(b.name),
+  );
+  if (!sets.length) return null;
+
+  return (
+    <section className="group">
+      <header className="group__head">
+        <h2 className="group__title">Comparisons</h2>
+        <span className="group__count num">{sets.length}</span>
+      </header>
+      <p className="group__hint">Tap to reopen a shortlist side by side.</p>
+
+      {sets.map((set) => {
+        const names = set.ids.map((id) => byId.get(String(id))?.name).filter(Boolean);
+        return (
+          <div className="cmpset" key={set.id}>
+            <button type="button" className="cmpset__main" onClick={() => loadComparison(set.id)}>
+              <div className="cmpset__name">{set.name}</div>
+              <div className="cmpset__members">
+                {names.length ? names.join(' · ') : 'None of these are in the list any more'}
+              </div>
+            </button>
+            <button
+              type="button"
+              className="pick__x"
+              aria-label={`Delete comparison ${set.name}`}
+              onClick={() => removeComparison(set.id)}
+            >
+              <IconClose width={14} height={14} />
+            </button>
+            <IconChevronRight className="row__chev" width={16} height={16} />
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+/**
+ * Saved restaurants that have left the roster.
+ *
+ * `mergeDataset` maps over the dataset, so without this these simply disappear
+ * after a refresh and it looks like the app lost your data.
+ */
+function OrphanNotice() {
+  const { orphans, forgetRecord } = useStore();
+  if (!orphans.length) return null;
+
+  return (
+    <section className="group">
+      <header className="group__head">
+        <h2 className="group__title">No longer listed</h2>
+        <span className="group__count num">{orphans.length}</span>
+      </header>
+      <p className="group__hint">
+        {orphans.length === 1 ? 'A place you saved is' : 'Places you saved are'} no longer in the
+        Miami Spice roster — the restaurant may have dropped out this season. Your notes are kept
+        until you clear them.
+      </p>
+      {orphans.map((o) => (
+        <div className="cmpset" key={o.id}>
+          <div className="cmpset__main">
+            <div className="cmpset__name">{o.name ?? `Restaurant #${o.id}`}</div>
+            <div className="cmpset__members">
+              {o.notes?.trim() ? o.notes : 'No notes'}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
+            onClick={() => forgetRecord(o.id)}
+          >
+            Clear
+          </button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/**
+ * A saved restaurant with a compare toggle beside it.
+ *
+ * The toggle sits OUTSIDE the row rather than inside: `RestaurantRow` is itself a
+ * button, and nesting a button inside a button is invalid HTML that browsers
+ * resolve unpredictably.
+ */
+function SavedRow({ record }) {
+  const { openDetail, origin, isInCompare, toggleCompare } = useStore();
+  const inCompare = isInCompare(record.id);
+
+  return (
+    <div className="myrow">
+      <RestaurantRow record={record} onOpen={openDetail} showDistance={!!origin} />
+      <button
+        type="button"
+        className={`myrow__cmp ${inCompare ? 'is-active' : ''}`}
+        aria-pressed={inCompare}
+        aria-label={
+          inCompare
+            ? `Remove ${record.name} from the comparison`
+            : `Add ${record.name} to the comparison`
+        }
+        onClick={() => toggleCompare(record.id)}
+      >
+        <IconCompare width={17} height={17} />
+      </button>
+    </div>
+  );
+}
 
 const GROUPS = [
   { status: 'booked', title: 'Booked', hint: 'You have a table.' },
@@ -21,7 +141,8 @@ const GROUPS = [
 ];
 
 export function MyListView() {
-  const { restaurants, openDetail, origin, goToTab } = useStore();
+  const { restaurants, openDetail, origin, goToTab, compareSets, orphans, isInCompare, toggleCompare } =
+    useStore();
 
   const grouped = useMemo(() => {
     const map = new Map(GROUPS.map((g) => [g.status, []]));
@@ -44,6 +165,8 @@ export function MyListView() {
   );
 
   const total = GROUPS.reduce((n, g) => n + grouped.get(g.status).length, 0) + noted.length;
+  const hasAnything =
+    total > 0 || Object.keys(compareSets).length > 0 || orphans.length > 0;
 
   return (
     <div className="view">
@@ -53,7 +176,9 @@ export function MyListView() {
       </header>
 
       <div className="list scroll-y">
-        {total === 0 ? (
+        <SavedComparisons />
+
+        {!hasAnything ? (
           <EmptyState
             icon={<IconBookmark width={26} height={26} />}
             title="Nothing saved yet"
@@ -82,12 +207,7 @@ export function MyListView() {
                   </header>
                   {g.hint && <p className="group__hint">{g.hint}</p>}
                   {items.map((r) => (
-                    <RestaurantRow
-                      key={r.id}
-                      record={r}
-                      onOpen={openDetail}
-                      showDistance={!!origin}
-                    />
+                    <SavedRow key={r.id} record={r} />
                   ))}
                 </section>
               );
@@ -101,12 +221,14 @@ export function MyListView() {
                 </header>
                 <p className="group__hint">You wrote something but didn't mark a status.</p>
                 {noted.map((r) => (
-                  <RestaurantRow key={r.id} record={r} onOpen={openDetail} showDistance={!!origin} />
+                  <SavedRow key={r.id} record={r} />
                 ))}
               </section>
             )}
           </>
         )}
+
+        <OrphanNotice />
       </div>
     </div>
   );

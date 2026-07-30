@@ -19,6 +19,15 @@ const check = (name, pass, detail = '') => {
   console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/**
+ * Scope a selector to the visible pane.
+ *
+ * Tabs stay mounted once visited so their state survives, which means several
+ * panes can contain a `.search__input` or a `.row` at the same time. Without this
+ * scope, selectors start matching a hidden screen.
+ */
+const vis = (page, sel) => page.locator(`.pane:not([hidden]) ${sel}`);
+
 const browser = await chromium.launch({ executablePath: CHROME });
 const context = await browser.newContext({
   viewport: { width: 412, height: 892 },
@@ -74,7 +83,7 @@ await page.waitForTimeout(2500);
 const dot = await page.locator('.me').count();
 const acc = await page.locator('.acc-circle').count();
 
-await page.locator('.tab', { hasText: /^Map$/ }).click();
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^Map$/ }) }).click();
 await page.waitForTimeout(3000);
 const dotOnMap = await page.locator('.me').count();
 const accOnMap = await page.locator('.acc-circle').count();
@@ -83,7 +92,7 @@ check('accuracy circle renders', accOnMap > 0);
 void dot;
 void acc;
 
-await page.locator('.tab', { hasText: /^List$/ }).click();
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^List$/ }) }).click();
 await page.waitForTimeout(400);
 await page.locator('.segmented__item', { hasText: 'Nearest' }).click();
 await page.waitForTimeout(900);
@@ -148,7 +157,10 @@ check('note survives a reload', after.entry?.notes === 'ask about the terrace');
 check('pin override survives a reload', after.override?.lat === 25.7777);
 
 // The override must also be visibly applied — promoting the record to Verified.
-await page.locator('.tab', { hasText: /^Calibrate$/ }).click();
+// Calibrate now lives behind Settings rather than in the tab bar.
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^Settings$/ }) }).click();
+await page.waitForTimeout(500);
+await page.locator('.navrow').first().click();
 await page.waitForTimeout(700);
 const verifiedCount = await page.evaluate(() =>
   [...document.querySelectorAll('.calstat__key')]
@@ -156,6 +168,7 @@ const verifiedCount = await page.evaluate(() =>
     .find((t) => t.includes('Verified')) ?? null,
 );
 check('override promotes the record to Verified in the UI', !!verifiedCount, verifiedCount ?? 'not shown');
+check('Calibrate is reachable from Settings', (await page.locator('.calstat').count()) > 0);
 
 /* ------------------------------------------------------------ export/import */
 
@@ -179,6 +192,91 @@ const roundTrip = await page.evaluate((payload) => {
   };
 }, exported);
 check('import restores both stores', roundTrip.ov > 0 && roundTrip.ud > 0, `${roundTrip.ov} pins, ${roundTrip.ud} saved`);
+
+/* ------------------------------------------------------------------ compare */
+
+console.log('\ncompare');
+
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^List$/ }) }).click();
+await page.waitForTimeout(500);
+
+// Add three restaurants through the detail sheet, the real entry point.
+const picked = [];
+for (const q of ['Reunion', 'Hereford', 'Komodo']) {
+  await vis(page, '.search__input').fill(q);
+  await page.waitForTimeout(500);
+  if (!(await vis(page, '.row').count())) continue;
+  await vis(page, '.row').first().click();
+  await page.waitForTimeout(600);
+  picked.push((await page.locator('.sheet[open] .sheet__title').textContent()).trim());
+  await page.locator('.sheet[open] .cmptoggle .btn').first().click();
+  await page.waitForTimeout(250);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(350);
+}
+await vis(page, '.search__clear').click().catch(() => {});
+
+check('tab badge reflects the tray', (await page.locator('.tab__badge').textContent()) === '3', picked.join(', '));
+
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^Compare$/ }) }).click();
+await page.waitForTimeout(900);
+
+check('all three picks render', (await vis(page, '.pick').count()) === 3);
+check('availability grid renders', (await vis(page, '.avail__block').count()) > 0);
+check('at-a-glance matrix renders', (await vis(page, '.glance__table').count()) === 1);
+check(
+  'three picks use the course accordion, not columns',
+  (await vis(page, '.macc__item').count()) > 0 && (await vis(page, '.mcols').count()) === 0,
+);
+
+// The shared-availability claim must agree with the grid it's drawn from.
+const consistent = await page.evaluate(() => {
+  const shared = document.querySelector('.shared');
+  if (!shared) return 'no headline';
+  const ringed = document.querySelectorAll('.avail__dot.is-shared').length;
+  const rows = document.querySelectorAll('.avail__row').length;
+  const blocks = document.querySelectorAll('.avail__block').length;
+  const perBlock = rows / Math.max(blocks, 1);
+  // Every shared slot should be ringed once per restaurant.
+  return ringed % perBlock === 0 ? 'ok' : `ringed ${ringed} not divisible by ${perBlock}`;
+});
+check('shared slots match the grid', consistent === 'ok', consistent);
+
+// Drop one and the layout must switch to two-up columns.
+await vis(page, '.pick__x').first().click();
+await page.waitForTimeout(700);
+check(
+  'two picks switch to side-by-side columns',
+  (await vis(page, '.mcols').count()) === 1 && (await vis(page, '.macc__item').count()) === 0,
+);
+
+// Save as a named set, then confirm it survives a reload and reloads into the tray.
+await page.getByRole('button', { name: 'Save', exact: true }).click();
+await page.waitForTimeout(500);
+await page.locator('.sheet[open] .notes__input').fill('Friday night');
+await page.getByRole('button', { name: 'Save', exact: true }).last().click();
+await page.waitForTimeout(600);
+
+// The app restores the last tab, which is now Compare — so wait for the shell
+// rather than for a list row that this screen doesn't have.
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForSelector('.tabbar', { timeout: 20000 });
+await page.waitForTimeout(1200);
+
+const trayAfter = await page.evaluate(
+  () => JSON.parse(localStorage.getItem('msn.compare.v1') ?? '{}').ids?.length ?? 0,
+);
+check('compare tray survives a reload', trayAfter === 2, `${trayAfter} in tray`);
+
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^My list$/ }) }).click();
+await page.waitForTimeout(600);
+check('saved comparison appears in My list', (await vis(page, '.cmpset').count()) > 0);
+
+const setsExport = await page.evaluate(() => {
+  const sets = JSON.parse(localStorage.getItem('msn.compare_sets.v1') ?? '{}');
+  return Object.values(sets)[0] ?? null;
+});
+check('named set stored with its name and members', setsExport?.name === 'Friday night' && setsExport?.ids?.length === 2);
 
 /* -------------------------------------------------------------- PWA/offline */
 
@@ -219,10 +317,15 @@ await context.setOffline(true);
 await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
 await page.waitForTimeout(3500);
 
-// The app restores the last-used tab, which by now is Calibrate — and that view
-// renders `.calrow`, not `.row`. Count both so the check measures whether the
-// dataset loaded, not which screen happens to be showing.
-const offlineRows = await page.locator('.row, .calrow').count();
+// Go to the List explicitly: the app restores whichever tab was last used, and
+// this check is about whether the DATASET survived, not which screen is showing.
+await page
+  .locator('.tab', { has: page.locator('.tab__label', { hasText: /^List$/ }) })
+  .click()
+  .catch(() => {});
+await page.waitForTimeout(1200);
+
+const offlineRows = await vis(page, '.row').count();
 const offlineError = await page.locator('.empty__title').textContent().catch(() => null);
 check(
   'app shell + dataset work offline',
@@ -243,7 +346,7 @@ const offlineFetch = await page.evaluate(async () => {
 check('dataset is served from cache while offline', offlineFetch.startsWith('served 200'), offlineFetch);
 
 // Map tiles already viewed should also survive the network going away.
-await page.locator('.tab', { hasText: /^Map$/ }).click();
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^Map$/ }) }).click();
 await page.waitForTimeout(2500);
 check('map view renders offline', (await page.locator('.leaflet-container').count()) > 0);
 

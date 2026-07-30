@@ -1,4 +1,4 @@
-# Build and publish to GitHub Pages.
+# Build and publish to GitHub Pages, and re-scrape the roster weekly.
 #
 # HTTPS is a hard requirement, not a nicety: geolocation and service workers both
 # need a secure context, so the app cannot be meaningfully tested from a phone over
@@ -11,10 +11,20 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # Re-scrape weekly. The Miami Spice roster grows through the season — it went
+  # from ~200 entries in early July to 351 by the end of the month, and a whole
+  # new Homestead section appeared — so a static dataset goes stale fast.
+  schedule:
+    - cron: '17 9 * * 1' # Mondays, 09:17 UTC (~5am Miami)
   workflow_dispatch:
+    inputs:
+      scrape:
+        description: 'Re-scrape the roster before building'
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write # needed to commit a refreshed dataset
   pages: write
   id-token: write
 
@@ -35,6 +45,59 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Decide whether to scrape
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.scrape }}" = "true" ]; then
+            echo "scrape=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "scrape=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Restore the scraper's HTTP caches. This is what makes a weekly run
+      # acceptable: with the cache warm, only genuinely new restaurants are
+      # fetched. Without it every run would re-request 352 detail pages plus all
+      # the geocoding, which Nominatim's usage policy explicitly discourages.
+      # The key rotates weekly so the cache is refreshed rather than pinned
+      # forever, and restore-keys let a new week start from last week's cache.
+      - name: Restore scrape caches
+        if: steps.mode.outputs.scrape == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            pipeline/cache
+            pipeline/geocache
+          key: scrape-cache-${{ github.run_id }}
+          restore-keys: |
+            scrape-cache-
+
+      - name: Re-scrape
+        if: steps.mode.outputs.scrape == 'true'
+        run: npm run pipeline
+
+      # A bad scrape must never overwrite a good dataset. This fails the job
+      # before anything is committed or deployed.
+      - name: Sanity-check the dataset
+        if: steps.mode.outputs.scrape == 'true'
+        run: node scripts/check-dataset.mjs
+
+      - name: Commit refreshed data
+        if: steps.mode.outputs.scrape == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/restaurants.json geocode-review.md
+          if git diff --cached --quiet; then
+            echo "Roster unchanged — nothing to commit."
+          else
+            # [skip ci] so this push doesn't trigger another build; this run
+            # deploys the new data itself a few steps below.
+            git commit -m "Weekly roster refresh [skip ci]"
+            git push
+          fi
+
+      - run: npm test
 
       # BASE_PATH must match the Pages subpath for a project site. The default
       # relative base also works, but setting it explicitly keeps the service

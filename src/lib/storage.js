@@ -16,7 +16,12 @@ const KEYS = {
   overrides: 'msn.pin_overrides.v1',
   userData: 'msn.user_data.v1',
   prefs: 'msn.prefs.v1',
+  compare: 'msn.compare.v1',
+  compareSets: 'msn.compare_sets.v1',
 };
+
+/** Comparing more than four columns doesn't fit a phone. */
+export const MAX_COMPARE = 4;
 
 export const STATUSES = ['none', 'favorite', 'want_to_go', 'booked', 'been'];
 
@@ -99,6 +104,9 @@ export function loadUserData() {
     clean[String(id)] = {
       status: STATUSES.includes(entry.status) ? entry.status : 'none',
       notes: typeof entry.notes === 'string' ? entry.notes : '',
+      // Kept so a restaurant that later leaves the roster can still be named back
+      // to the user instead of appearing as a bare numeric id.
+      name: typeof entry.name === 'string' ? entry.name : null,
       updated_at: entry.updated_at ?? null,
     };
   }
@@ -108,7 +116,7 @@ export function loadUserData() {
 export function saveUserEntry(id, patch) {
   const all = loadUserData();
   const key = String(id);
-  const current = all[key] ?? { status: 'none', notes: '', updated_at: null };
+  const current = all[key] ?? { status: 'none', notes: '', name: null, updated_at: null };
   const next = { ...current, ...patch, updated_at: today() };
 
   // Drop entries that carry no information, so "My list" and exports stay clean.
@@ -116,6 +124,80 @@ export function saveUserEntry(id, patch) {
   else all[key] = next;
 
   return { ...writeObject(KEYS.userData, all), userData: all };
+}
+
+/** Remove an entry outright, notes included. Used to dismiss departed restaurants. */
+export function forgetUserEntry(id) {
+  const all = loadUserData();
+  delete all[String(id)];
+  return { ...writeObject(KEYS.userData, all), userData: all };
+}
+
+/* ------------------------------------------------------- compare tray + sets */
+
+/**
+ * The active comparison — a working shortlist, not a saved document.
+ *
+ * Persisted because a shortlist gets built up over an afternoon of browsing, and
+ * losing it to a reload would defeat the point.
+ */
+export function loadCompare() {
+  const raw = readObject(KEYS.compare);
+  const ids = Array.isArray(raw.ids) ? raw.ids.map(String) : [];
+  // De-duplicate and enforce the cap on read, so a hand-edited or imported value
+  // can never put the UI into a state it can't render.
+  return [...new Set(ids)].slice(0, MAX_COMPARE);
+}
+
+export function saveCompare(ids) {
+  const clean = [...new Set((ids ?? []).map(String))].slice(0, MAX_COMPARE);
+  return { ...writeObject(KEYS.compare, { ids: clean }), ids: clean };
+}
+
+/** Saved, named comparisons. Keyed by a generated id so names can repeat. */
+export function loadCompareSets() {
+  const raw = readObject(KEYS.compareSets);
+  const clean = {};
+  for (const [id, set] of Object.entries(raw)) {
+    if (!set || typeof set !== 'object') continue;
+    const ids = Array.isArray(set.ids) ? [...new Set(set.ids.map(String))].slice(0, MAX_COMPARE) : [];
+    if (!ids.length) continue;
+    clean[id] = {
+      id,
+      name: typeof set.name === 'string' && set.name.trim() ? set.name.trim() : 'Comparison',
+      ids,
+      created_at: set.created_at ?? null,
+      updated_at: set.updated_at ?? null,
+    };
+  }
+  return clean;
+}
+
+function newSetId() {
+  return `cmp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export function saveCompareSet(name, ids) {
+  const clean = [...new Set((ids ?? []).map(String))].slice(0, MAX_COMPARE);
+  if (clean.length < 2) {
+    return { ok: false, error: 'Pick at least two restaurants before saving.' };
+  }
+  const all = loadCompareSets();
+  const id = newSetId();
+  all[id] = {
+    id,
+    name: (name ?? '').trim() || 'Comparison',
+    ids: clean,
+    created_at: today(),
+    updated_at: today(),
+  };
+  return { ...writeObject(KEYS.compareSets, all), sets: all, id };
+}
+
+export function deleteCompareSet(id) {
+  const all = loadCompareSets();
+  delete all[String(id)];
+  return { ...writeObject(KEYS.compareSets, all), sets: all };
 }
 
 /* -------------------------------------------------------------------- prefs */
@@ -144,10 +226,14 @@ export function savePrefs(patch) {
 export function buildExport() {
   return {
     format: 'miami-spice-navigator-backup',
-    version: 1,
+    version: 2,
     exported_at: new Date().toISOString(),
     pin_overrides: loadOverrides(),
     user_data: loadUserData(),
+    // Saved comparisons are user work too — a backup that dropped them would be a
+    // silent data loss the user only discovers on a new device.
+    compare: loadCompare(),
+    compare_sets: loadCompareSets(),
     prefs: loadPrefs(),
   };
 }
@@ -170,15 +256,18 @@ export function importBackup(payload, { mode = 'merge' } = {}) {
 
   const incomingOverrides = payload.pin_overrides ?? payload.overrides ?? null;
   const incomingUserData = payload.user_data ?? payload.userData ?? null;
+  // v1 backups predate comparisons; their absence is normal, not an error.
+  const incomingSets = payload.compare_sets ?? payload.compareSets ?? null;
+  const incomingCompare = payload.compare ?? null;
 
-  if (!incomingOverrides && !incomingUserData) {
+  if (!incomingOverrides && !incomingUserData && !incomingSets) {
     return {
       ok: false,
-      error: 'No pin overrides or saved restaurants found in that file.',
+      error: 'No pin overrides, saved restaurants or comparisons found in that file.',
     };
   }
 
-  const summary = { overrides: 0, userData: 0, skipped: 0, mode };
+  const summary = { overrides: 0, userData: 0, sets: 0, skipped: 0, mode };
 
   if (incomingOverrides && typeof incomingOverrides === 'object') {
     const target = mode === 'replace' ? {} : loadOverrides();
@@ -216,6 +305,29 @@ export function importBackup(payload, { mode = 'merge' } = {}) {
     const res = writeObject(KEYS.userData, target);
     if (!res.ok) return { ok: false, error: `Could not save your list: ${res.error}` };
   }
+
+  if (incomingSets && typeof incomingSets === 'object') {
+    const target = mode === 'replace' ? {} : loadCompareSets();
+    for (const [id, set] of Object.entries(incomingSets)) {
+      const ids = Array.isArray(set?.ids) ? [...new Set(set.ids.map(String))].slice(0, MAX_COMPARE) : [];
+      if (ids.length < 2) {
+        summary.skipped++;
+        continue;
+      }
+      target[String(id)] = {
+        id: String(id),
+        name: typeof set.name === 'string' && set.name.trim() ? set.name.trim() : 'Comparison',
+        ids,
+        created_at: set.created_at ?? today(),
+        updated_at: set.updated_at ?? today(),
+      };
+      summary.sets++;
+    }
+    const res = writeObject(KEYS.compareSets, target);
+    if (!res.ok) return { ok: false, error: `Could not save comparisons: ${res.error}` };
+  }
+
+  if (Array.isArray(incomingCompare)) saveCompare(incomingCompare);
 
   return { ok: true, summary };
 }

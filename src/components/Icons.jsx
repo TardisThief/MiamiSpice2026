@@ -205,6 +205,19 @@ export function IconRefresh(p) {
   );
 }
 
+/**
+ * Compare: two columns of differing height, read as things measured against each
+ * other. Chosen over a balance scale, which reads as "justice" at 21px.
+ */
+export function IconCompare(p) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3.5" y="7" width="7" height="13.5" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="17" rx="1.5" />
+    </svg>
+  );
+}
+
 export function IconSpark(p) {
   return (
     <svg {...base} {...p}>

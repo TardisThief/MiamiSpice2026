@@ -16,7 +16,14 @@ import { appleMapsUrl, formatDistance, isIos, nativeMapsUrl } from '../lib/geo.j
 import { ConfidenceNotice } from './ConfidenceBadge.jsx';
 import { Sheet } from './primitives.jsx';
 import { STATUSES, STATUS_LABELS } from '../lib/storage.js';
-import { IconLink, IconNavigate, IconPhone, IconSpark, IconPin } from './Icons.jsx';
+import {
+  IconCompare,
+  IconLink,
+  IconNavigate,
+  IconPhone,
+  IconPin,
+  IconSpark,
+} from './Icons.jsx';
 
 const MEAL_LABEL = { brunch: 'Brunch', lunch: 'Lunch', dinner: 'Dinner' };
 
@@ -154,6 +161,50 @@ function StatusPicker({ record }) {
   );
 }
 
+/**
+ * Add/remove from the comparison tray.
+ *
+ * Sits with the status picker because deciding "this is a contender" is the same
+ * kind of act as marking it want-to-go — you're shortlisting, not navigating.
+ */
+function CompareToggle({ record }) {
+  const { isInCompare, toggleCompare, compareIds, maxCompare, goToTab, closeDetail } = useStore();
+  const inCompare = isInCompare(record.id);
+  const full = !inCompare && compareIds.length >= maxCompare;
+
+  return (
+    <div className="cmptoggle">
+      <button
+        type="button"
+        className={`btn btn--sm ${inCompare ? 'btn--primary' : 'btn--ghost'}`}
+        onClick={() => toggleCompare(record.id)}
+      >
+        <IconCompare width={16} height={16} />
+        {inCompare ? 'In comparison' : 'Compare'}
+      </button>
+
+      {inCompare && compareIds.length > 1 && (
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost"
+          onClick={() => {
+            closeDetail();
+            goToTab('compare');
+          }}
+        >
+          View {compareIds.length} side by side
+        </button>
+      )}
+
+      {full && (
+        <span className="cmptoggle__full">
+          Comparing {maxCompare} already — remove one first.
+        </span>
+      )}
+    </div>
+  );
+}
+
 function NotesField({ record }) {
   const { setNotes } = useStore();
   const [value, setValue] = useState(record.notes ?? '');
@@ -250,6 +301,7 @@ export function DetailSheet() {
           <h3 className="detail__h">Your list</h3>
           <StatusPicker record={r} />
           <NotesField record={r} />
+          <CompareToggle record={r} />
         </section>
 
         <section className="detail__sec">

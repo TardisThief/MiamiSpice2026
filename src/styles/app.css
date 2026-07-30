@@ -70,6 +70,28 @@
   transition: color var(--d-fast) var(--ease);
 }
 
+.tab__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.tab__badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-radius: var(--r-full);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .tab__label {
   font-size: 10.5px;
   font-weight: 500;
@@ -1631,6 +1653,579 @@
   padding: 0 var(--s-4) var(--s-2);
   font-size: var(--t-xs);
   color: var(--ink-2);
+}
+
+.navrow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 12px 0;
+  text-align: left;
+}
+
+.navrow__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.navrow__main strong {
+  display: block;
+  font-size: var(--t-base);
+  font-weight: 600;
+}
+
+.navrow__sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+}
+
+.navrow__chev {
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.sset .notice {
+  margin-top: var(--s-3);
+}
+
+.sset .notice .btn {
+  margin-top: var(--s-2);
+}
+
+.backbtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-left: -6px;
+  border-radius: var(--r-full);
+  color: var(--ink-2);
+  flex-shrink: 0;
+}
+
+.backbtn:active {
+  background: var(--surface-2);
+}
+
+.backbtn__icon {
+  transform: rotate(180deg);
+}
+
+.topbar__title--back {
+  flex: 1;
+}
+
+/* ============================================================== compare === */
+
+.cmp__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.cmp__sec {
+  padding: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.cmp__h {
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: var(--s-3);
+}
+
+.cmp__hint,
+.cmp__none {
+  padding: 0 var(--s-4) var(--s-3);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+.cmp__none {
+  padding: 0;
+}
+
+.cmp__warn {
+  margin: 0 var(--s-4) var(--s-3);
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent-soft-ink);
+  font-size: var(--t-sm);
+}
+
+.cmp__meals {
+  padding-inline: 0;
+}
+
+/* ---- the picks ---- */
+
+.picks {
+  display: flex;
+  gap: 6px;
+  padding: var(--s-2) var(--s-4) var(--s-3);
+}
+
+.pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  /* Padding lives on the children so each is its own comfortable tap target
+     rather than a 20px sliver inside a taller chip. */
+  padding: 0 3px 0 0;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+}
+
+.pick__name {
+  padding: 9px 2px 9px 13px;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--ink);
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pick__x {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-full);
+  color: var(--ink-2);
+  flex-shrink: 0;
+}
+
+.pick__x:active {
+  background: var(--surface-3);
+}
+
+/* ---- shared availability headline ---- */
+
+.shared {
+  margin: 0 var(--s-4) var(--s-2);
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: var(--primary-soft);
+  color: var(--primary-soft-ink);
+}
+
+.shared--none {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
+.shared__label {
+  display: block;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.shared--none p {
+  font-size: var(--t-sm);
+  line-height: var(--lh-snug);
+}
+
+.shared__slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.shared__slot {
+  font-size: var(--t-md);
+}
+
+.shared__slot strong {
+  font-weight: 700;
+}
+
+/* ---- availability grid ---- */
+
+.avail__block {
+  margin-bottom: var(--s-4);
+}
+
+.avail__head,
+.avail__row {
+  display: grid;
+  /* Name column shrinks so seven day columns always fit, even at 320px. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.avail__head {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+}
+
+.avail__meal {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.avail__days,
+.avail__dots {
+  display: grid;
+  grid-template-columns: repeat(7, 18px);
+  gap: 3px;
+  justify-items: center;
+}
+
+.avail__day {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.avail__day.is-shared {
+  color: var(--primary);
+}
+
+.avail__row {
+  padding: 4px 0;
+}
+
+.avail__name {
+  font-size: var(--t-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avail__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface-3);
+}
+
+.avail__dot.is-on {
+  background: var(--ink-3);
+}
+
+/* A ring, not just a colour: the shared days are the answer, and the distinction
+   has to survive glare and colourblindness. */
+.avail__dot.is-shared {
+  background: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-ring);
+}
+
+.avail__legend {
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+}
+
+/* ---- at-a-glance matrix ---- */
+
+.glance__table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--t-sm);
+}
+
+.glance__table th,
+.glance__table td {
+  text-align: left;
+  padding: 7px 10px 7px 0;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+.glance__corner {
+  width: 4.5rem;
+}
+
+.glance__label {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.glance__name {
+  min-width: 7.5rem;
+}
+
+.glance__namebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0;
+  min-height: 32px;
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: var(--ink);
+  text-align: left;
+}
+
+.glance__cell--strong {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.glance__none {
+  color: var(--ink-2);
+}
+
+.glance__ok {
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+}
+
+.glance__maps {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 9px 7px 0;
+  min-height: 32px;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+/* ---- menus: two-up columns ---- */
+
+.mcols__head,
+.mcols__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+
+.mcols__head {
+  padding-bottom: 6px;
+  margin-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.mcols__name {
+  display: block;
+  font-size: var(--t-sm);
+  font-weight: 700;
+}
+
+.mcols__price {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.mcols__course {
+  margin-bottom: var(--s-4);
+}
+
+.mcols__course .course__name {
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---- menus: course accordion ---- */
+
+.macc__item {
+  border-bottom: 1px solid var(--line);
+}
+
+.macc__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 0;
+  text-align: left;
+}
+
+.macc__name {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.macc__chev {
+  color: var(--ink-3);
+  transition: transform var(--d-base) var(--ease);
+}
+
+.macc__chev.is-open {
+  transform: rotate(180deg);
+}
+
+.macc__body {
+  padding-bottom: var(--s-3);
+}
+
+.macc__rest {
+  margin-bottom: var(--s-3);
+}
+
+.macc__restname {
+  display: block;
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 3px;
+  /*
+   * Sticky because a course can run past a screenful across four restaurants, and
+   * a list of dishes with no visible owner is useless for comparing. The name
+   * follows you down its own block and hands off to the next.
+   */
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: var(--bg);
+  padding: 4px 0 3px;
+}
+
+/* ---- dishes inside a comparison ---- */
+
+.cmpdish {
+  margin-bottom: 6px;
+}
+
+.cmpdish__variant {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--primary-soft-ink);
+  background: var(--primary-soft);
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  margin-bottom: 3px;
+}
+
+.cmpdish__list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cmpdish__name {
+  display: block;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+}
+
+.cmpdish__desc {
+  display: block;
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  line-height: var(--lh-snug);
+}
+
+.cmpdish__none {
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+}
+
+/* ---- add-to-compare in the detail sheet ---- */
+
+.cmptoggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.cmptoggle__full {
+  font-size: var(--t-xs);
+  color: var(--accent-soft-ink);
+}
+
+/* ---- save-comparison sheet ---- */
+
+.savecmp__list {
+  list-style: none;
+  padding: 0;
+  margin-top: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+/* ---- saved row with a compare toggle ---- */
+
+.myrow {
+  display: flex;
+  align-items: stretch;
+}
+
+.myrow .row {
+  flex: 1;
+  min-width: 0;
+}
+
+.myrow__cmp {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  flex-shrink: 0;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line);
+  transition: color var(--d-fast) var(--ease);
+}
+
+.myrow__cmp.is-active {
+  color: var(--primary);
+}
+
+.myrow__cmp:active {
+  background: var(--surface-2);
+}
+
+/* ---- saved comparisons in My list ---- */
+
+.cmpset {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: 12px var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.cmpset__main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.cmpset__name {
+  font-size: var(--t-md);
+  font-weight: 600;
+}
+
+.cmpset__members {
+  margin-top: 2px;
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ============================================================ calibrate === */

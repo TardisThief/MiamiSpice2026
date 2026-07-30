@@ -432,6 +432,141 @@ test('menus are parsed per meal and price variant, with days joined on', async (
   assert.equal(menus[1].courses[0].items[0].description, null);
 });
 
+/* ----------------------------------------------------------------- compare */
+
+/** Minimal record shaped like the shipped dataset. */
+const rec = (name, menus) => ({ id: name, name, menus, meals: [] });
+
+test('shared slots are the intersection across every pick', async () => {
+  const { sharedSlots } = await import('../src/lib/compare.js');
+
+  const a = rec('A', [{ meal: 'dinner', price: 65, days: ['Mon', 'Thu', 'Fri'], courses: [] }]);
+  const b = rec('B', [{ meal: 'dinner', price: 50, days: ['Thu', 'Fri', 'Sat'], courses: [] }]);
+  const c = rec('C', [{ meal: 'dinner', price: 40, days: ['Thu', 'Sun'], courses: [] }]);
+
+  assert.deepEqual(
+    sharedSlots([a, b]).map((s) => `${s.day} ${s.meal}`),
+    ['Thu dinner', 'Fri dinner'],
+  );
+  // Adding a third pick narrows it, never widens it.
+  assert.deepEqual(
+    sharedSlots([a, b, c]).map((s) => `${s.day} ${s.meal}`),
+    ['Thu dinner'],
+  );
+});
+
+test('no overlap returns empty rather than a misleading union', async () => {
+  const { sharedSlots } = await import('../src/lib/compare.js');
+  const a = rec('A', [{ meal: 'dinner', price: 65, days: ['Mon'], courses: [] }]);
+  const b = rec('B', [{ meal: 'dinner', price: 50, days: ['Tue'], courses: [] }]);
+  assert.deepEqual(sharedSlots([a, b]), []);
+  // An empty selection has no shared availability, not universal availability.
+  assert.deepEqual(sharedSlots([]), []);
+});
+
+test('meals are matched separately — same day, different meal is not shared', async () => {
+  const { sharedSlots } = await import('../src/lib/compare.js');
+  const a = rec('A', [{ meal: 'lunch', price: 40, days: ['Thu'], courses: [] }]);
+  const b = rec('B', [{ meal: 'dinner', price: 65, days: ['Thu'], courses: [] }]);
+  assert.deepEqual(sharedSlots([a, b]), []);
+});
+
+test('availability grid omits meals nobody offers', async () => {
+  const { availabilityByMeal } = await import('../src/lib/compare.js');
+  const a = rec('A', [{ meal: 'dinner', price: 65, days: ['Mon', 'Tue'], courses: [] }]);
+  const b = rec('B', [{ meal: 'dinner', price: 50, days: ['Tue'], courses: [] }]);
+
+  const blocks = availabilityByMeal([a, b]);
+  assert.deepEqual(blocks.map((x) => x.meal), ['dinner'], 'no empty brunch/lunch blocks');
+
+  const tue = blocks[0].days.find((d) => d.day === 'Tue');
+  assert.deepEqual(tue.per, [true, true]);
+  assert.equal(tue.all, true);
+
+  const mon = blocks[0].days.find((d) => d.day === 'Mon');
+  assert.deepEqual(mon.per, [true, false]);
+  assert.equal(mon.all, false);
+  assert.equal(mon.any, true);
+});
+
+test('the menu comparison opens on the most-shared meal', async () => {
+  const { bestSharedMeal } = await import('../src/lib/compare.js');
+
+  const a = rec('A', [
+    { meal: 'lunch', price: 40, days: ['Mon'], courses: [] },
+    { meal: 'dinner', price: 65, days: ['Mon', 'Tue', 'Wed'], courses: [] },
+  ]);
+  const b = rec('B', [
+    { meal: 'lunch', price: 40, days: ['Fri'], courses: [] },
+    { meal: 'dinner', price: 50, days: ['Mon', 'Tue', 'Wed'], courses: [] },
+  ]);
+
+  // Dinner is shared on three days; lunch on none.
+  assert.equal(bestSharedMeal([a, b]), 'dinner');
+
+  // With nothing shared it still opens on something rather than null.
+  const c = rec('C', [{ meal: 'brunch', price: 40, days: ['Sat'], courses: [] }]);
+  const d = rec('D', [{ meal: 'brunch', price: 40, days: ['Sun'], courses: [] }]);
+  assert.equal(bestSharedMeal([c, d]), 'brunch');
+
+  assert.equal(bestSharedMeal([]), null);
+});
+
+test('slots fall back to the days table when no dishes were published', async () => {
+  const { slotsFor } = await import('../src/lib/compare.js');
+  const noMenus = {
+    id: 'x',
+    name: 'X',
+    menus: [],
+    meals: [{ meal: 'dinner', price: 50, days: ['Wed', 'Thu'], reserve: false }],
+  };
+  assert.deepEqual([...slotsFor(noMenus)].sort(), ['Thu|dinner', 'Wed|dinner']);
+});
+
+test('menus align into course rows, keeping price variants distinct', async () => {
+  const { alignMenus } = await import('../src/lib/compare.js');
+
+  const a = rec('A', [
+    {
+      meal: 'dinner',
+      price: 50,
+      days: ['Mon'],
+      courses: [{ name: 'Appetizers', items: [{ name: 'Soup' }] }],
+    },
+    {
+      meal: 'dinner',
+      price: 65,
+      days: ['Mon'],
+      courses: [{ name: 'Appetizers', items: [{ name: 'Oysters' }] }],
+    },
+  ]);
+  const b = rec('B', [
+    {
+      meal: 'dinner',
+      price: 40,
+      days: ['Mon'],
+      // A course the other restaurant doesn't have.
+      courses: [
+        { name: 'Appetizers', items: [{ name: 'Salad' }] },
+        { name: 'Amuse', items: [{ name: 'Gougère' }] },
+      ],
+    },
+  ]);
+
+  const { courses } = alignMenus([a, b], 'dinner');
+  assert.deepEqual(courses.map((c) => c.name), ['Appetizers', 'Amuse'], 'union in first-seen order');
+
+  const apps = courses[0];
+  // A serves two dinner price variants; both survive as separate blocks.
+  assert.equal(apps.byRecord[0].variants.length, 2);
+  assert.deepEqual(apps.byRecord[0].variants.map((v) => v.price), [50, 65]);
+  assert.equal(apps.byRecord[1].variants.length, 1);
+
+  // A record with nothing in a course contributes an empty block, not a crash.
+  assert.equal(courses[1].byRecord[0].variants.length, 0);
+  assert.equal(courses[1].byRecord[1].variants[0].items[0].name, 'Gougère');
+});
+
 /* ------------------------------------------------------------------ geometry */
 
 test('haversine matches a known Miami distance', () => {

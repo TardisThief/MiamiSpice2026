@@ -21,6 +21,7 @@ import { Chip, EmptyState, Sheet } from './primitives.jsx';
 import { buildExport, downloadExport, importBackup } from '../lib/storage.js';
 import {
   IconCheck,
+  IconChevronRight,
   IconDownload,
   IconLink,
   IconPin,
@@ -34,7 +35,7 @@ import {
 const TIER_FILTERS = ['neighborhood_only', 'approximate', 'address_exact', 'poi_match', 'verified'];
 
 export function CalibrateView() {
-  const { restaurants, meta, selected, openDetail, closeDetail, showToast, refreshFromStorage } =
+  const { restaurants, meta, selected, openDetail, closeDetail, showToast, refreshFromStorage, goToTab, tab } =
     useStore();
 
   const [query, setQuery] = useState('');
@@ -66,8 +67,17 @@ export function CalibrateView() {
 
   return (
     <div className="view">
+      {/* No longer in the tab bar, so it needs its own way back. */}
       <header className="topbar topbar--plain">
-        <h1 className="topbar__title">Calibrate</h1>
+        <button
+          type="button"
+          className="backbtn"
+          onClick={() => goToTab('settings')}
+          aria-label="Back to settings"
+        >
+          <IconChevronRight width={18} height={18} className="backbtn__icon" />
+        </button>
+        <h1 className="topbar__title topbar__title--back">Calibrate</h1>
         <button type="button" className="btn btn--sm btn--ghost" onClick={() => setDataOpen(true)}>
           Backup
         </button>
@@ -188,7 +198,13 @@ export function CalibrateView() {
         )}
       </div>
 
-      {selected && <PinEditor record={selected} onClose={closeDetail} />}
+      {/*
+        Gated on the active tab, not just on `selected`. This view stays mounted
+        once visited so its queue and scroll survive, which means without the gate
+        opening any restaurant from the List would also open the pin editor here,
+        stacking two dialogs.
+      */}
+      {tab === 'calibrate' && selected && <PinEditor record={selected} onClose={closeDetail} />}
 
       <DataSheet
         open={dataOpen}

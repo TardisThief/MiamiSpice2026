@@ -15,11 +15,31 @@ const BASE = process.argv[2] ?? 'http://localhost:4173/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const WIDTHS = [320, 360, 412, 768, 1280];
-const TABS = ['List', 'Map', 'My list', 'Calibrate', 'Settings'];
+const TABS = ['List', 'Map', 'My list', 'Compare', 'Settings'];
 
 const findings = [];
 
 const browser = await chromium.launch({ executablePath: CHROME });
+
+/**
+ * Pre-fill the comparison tray with four restaurants.
+ *
+ * An empty Compare tab renders an empty state, which would hide the layout that
+ * is actually at risk here: the availability grid puts seven day columns beside
+ * four restaurant names, and 320px is where that either fits or doesn't.
+ */
+async function seedCompare(page) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        'msn.compare.v1',
+        JSON.stringify({ ids: ['22780', '56415', '6324', '5810'] }),
+      );
+    } catch {
+      /* private mode — the audit still runs, just without a seeded tray */
+    }
+  });
+}
 
 /* ------------------------------------------------- horizontal overflow pass */
 
@@ -31,11 +51,16 @@ for (const width of WIDTHS) {
     hasTouch: width < 768,
   });
   const page = await ctx.newPage();
+  await seedCompare(page);
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForSelector('.row', { timeout: 20000 });
 
   for (const tab of TABS) {
-    await page.locator('.tab', { hasText: new RegExp(`^${tab}$`) }).click();
+    // Matched via .tab__label: the Compare tab also renders a count badge, so
+    // the button's own textContent can be "3Compare".
+    await page
+      .locator('.tab', { has: page.locator('.tab__label', { hasText: new RegExp(`^${tab}$`) }) })
+      .click();
     await page.waitForTimeout(tab === 'Map' ? 2500 : 500);
 
     const overflow = await page.evaluate(() => {
@@ -72,11 +97,16 @@ console.log('\ntouch targets and accessible names');
     hasTouch: true,
   });
   const page = await ctx.newPage();
+  await seedCompare(page);
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForSelector('.row', { timeout: 20000 });
 
   for (const tab of TABS) {
-    await page.locator('.tab', { hasText: new RegExp(`^${tab}$`) }).click();
+    // Matched via .tab__label: the Compare tab also renders a count badge, so
+    // the button's own textContent can be "3Compare".
+    await page
+      .locator('.tab', { has: page.locator('.tab__label', { hasText: new RegExp(`^${tab}$`) }) })
+      .click();
     await page.waitForTimeout(tab === 'Map' ? 2500 : 500);
 
     const issues = await page.evaluate(() => {
@@ -129,6 +159,7 @@ for (const scheme of ['light', 'dark']) {
     colorScheme: scheme,
   });
   const page = await ctx.newPage();
+  await seedCompare(page);
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForSelector('.row', { timeout: 20000 });
 

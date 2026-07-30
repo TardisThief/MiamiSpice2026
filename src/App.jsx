@@ -12,27 +12,35 @@ import { ListView } from './components/ListView.jsx';
 import { MapView } from './components/MapView.jsx';
 import { MyListView } from './components/MyListView.jsx';
 import { CalibrateView } from './components/CalibrateView.jsx';
+import { CompareView } from './components/CompareView.jsx';
 import { SettingsView } from './components/SettingsView.jsx';
 import { DetailSheet } from './components/DetailSheet.jsx';
 import { ErrorState, Toast } from './components/primitives.jsx';
 import {
   IconBookmark,
+  IconCompare,
   IconList,
   IconMap,
-  IconPin,
   IconSettings,
 } from './components/Icons.jsx';
 
+/*
+ * Calibrate is deliberately absent: it's a maintenance tool, valuable during an
+ * initial pin-fixing pass and dead weight in the bottom bar every day after. It
+ * remains a routable view id, reached from Settings and from "Fix this pin" inside
+ * a restaurant, so nothing about that flow changed.
+ */
 const TABS = [
   { id: 'list', label: 'List', Icon: IconList },
   { id: 'map', label: 'Map', Icon: IconMap },
   { id: 'mine', label: 'My list', Icon: IconBookmark },
-  { id: 'calibrate', label: 'Calibrate', Icon: IconPin },
+  { id: 'compare', label: 'Compare', Icon: IconCompare },
   { id: 'settings', label: 'Settings', Icon: IconSettings },
 ];
 
 export default function App() {
-  const { tab, goToTab, loadState, loadError, reload, toast, selected, closeDetail } = useStore();
+  const { tab, goToTab, loadState, loadError, reload, toast, selected, closeDetail, compareIds } =
+    useStore();
 
   // Keep visited tabs mounted so their state (scroll, map, markers) survives.
   const [visited, setVisited] = useState(() => new Set([tab]));
@@ -92,6 +100,11 @@ export default function App() {
             <MyListView />
           </div>
         )}
+        {visited.has('compare') && (
+          <div className="pane" hidden={tab !== 'compare'}>
+            <CompareView />
+          </div>
+        )}
         {visited.has('calibrate') && (
           <div className="pane" hidden={tab !== 'calibrate'}>
             <CalibrateView />
@@ -113,7 +126,14 @@ export default function App() {
             aria-current={tab === id ? 'page' : undefined}
             onClick={() => goToTab(id)}
           >
-            <Icon width={21} height={21} />
+            <span className="tab__icon">
+              <Icon width={21} height={21} />
+              {/* The Compare tab is empty most of the time; the count is what tells
+                  you there's something waiting in it. */}
+              {id === 'compare' && compareIds.length > 0 && (
+                <span className="tab__badge num">{compareIds.length}</span>
+              )}
+            </span>
             <span className="tab__label">{label}</span>
           </button>
         ))}
