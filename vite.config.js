@@ -19,10 +19,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png'],
       manifest: {
-        name: 'Miami Spice 2026 Navigator',
-        short_name: 'Miami Spice',
+        name: 'Better Miami Spice',
+        short_name: 'Better Spice',
         description:
-          'Browse, filter and map the 350+ restaurants in Miami Spice Restaurant Months 2026.',
+          'Browse, filter and map every restaurant in Miami Spice Restaurant Months 2026.',
         start_url: '.',
         scope: '.',
         display: 'standalone',
@@ -49,7 +49,7 @@ export default defineConfig({
          * because the app fetches the dataset during boot on the very first visit,
          * before the service worker has claimed the page.
          */
-        globPatterns: ['**/*.{js,css,html,json,png,svg,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,json,png,jpg,svg,webmanifest}'],
         // The dataset is ~1.3 MB; the default 2 MiB cap is close enough to it that
         // a growing roster could silently cross the line and break offline use.
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,

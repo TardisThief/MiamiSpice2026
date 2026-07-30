@@ -2881,6 +2881,106 @@
   color: var(--primary-soft-ink);
 }
 
+/* ================================================================ brand === */
+
+/*
+ * The wordmark is black-and-red artwork on white, so it always sits on a white
+ * plate. Filtering it for dark mode (invert + hue-rotate) flips the black
+ * correctly but shifts the red off-brand, and a nearly-right red reads as broken
+ * in a way a deliberate white plate does not.
+ */
+.brand {
+  display: block;
+  background: #fff;
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  line-height: 0;
+}
+
+.brand__img {
+  width: 100%;
+  height: auto;
+}
+
+.brand--btn {
+  width: 100%;
+  border: 1px solid transparent;
+  transition:
+    border-color var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--ease);
+}
+
+.brand--btn:hover {
+  border-color: var(--line-strong);
+}
+
+.brand--btn:active {
+  transform: scale(0.99);
+}
+
+/* Hidden on mobile: the tab bar is five thumb targets and nothing else fits. */
+.brand--sidebar {
+  display: none;
+}
+
+.brand--settings {
+  max-width: 15rem;
+  margin-top: var(--s-3);
+}
+
+.brand--about {
+  max-width: 17rem;
+  margin: 0 auto var(--s-4);
+}
+
+.sset--brand {
+  border-bottom: none;
+  padding-bottom: var(--s-8);
+}
+
+/* ---- about ---- */
+
+.about p {
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--ink-2);
+  margin-bottom: var(--s-3);
+  max-width: 62ch;
+}
+
+.about__lede {
+  font-size: var(--t-md) !important;
+  color: var(--ink) !important;
+}
+
+.about__h {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: var(--s-5) 0 var(--s-2);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.about strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.about a {
+  color: var(--primary);
+}
+
+.about__fine {
+  font-size: var(--t-xs) !important;
+}
+
+.about__cta {
+  margin-top: var(--s-4);
+}
+
 /* ================================================== empty / skeleton / toast */
 
 .empty {
@@ -3093,6 +3193,13 @@
   .tab__badge {
     position: static;
     margin-left: auto;
+  }
+
+  .brand--sidebar {
+    display: block;
+    /* Pushed to the bottom of the sidebar column. */
+    margin-top: auto;
+    max-width: 100%;
   }
 
   /* More room for the content itself. */

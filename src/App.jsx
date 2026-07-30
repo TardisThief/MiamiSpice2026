@@ -17,6 +17,7 @@ import { CompareView } from './components/CompareView.jsx';
 import { SettingsView } from './components/SettingsView.jsx';
 import { DetailPane, DetailSheet } from './components/DetailSheet.jsx';
 import { ErrorState, Toast } from './components/primitives.jsx';
+import { AboutSheet, Logo } from './components/Brand.jsx';
 import {
   IconBookmark,
   IconCompare,
@@ -154,11 +155,17 @@ export default function App() {
             <span className="tab__label">{label}</span>
           </button>
         ))}
+
+        {/* Desktop only: the sidebar has room at the bottom for the wordmark,
+            which doubles as the way into About. */}
+        <Logo placement="sidebar" interactive />
       </nav>
 
       {/* The detail sheet belongs to the shell, not a view, so it survives tab
           switches — the Calibrate view opens its own pin editor instead. */}
       {tab !== 'calibrate' && !useSplit && <DetailSheet />}
+
+      <AboutSheet />
 
       <Toast toast={toast} />
     </div>

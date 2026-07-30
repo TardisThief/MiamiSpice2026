@@ -9,6 +9,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { Segmented } from './primitives.jsx';
+import { Logo } from './Brand.jsx';
 import { formatAccuracy } from '../lib/geo.js';
 import {
   IconAlert,
@@ -48,6 +49,7 @@ export function SettingsView() {
     meta,
     restaurants,
     goToTab,
+    openAbout,
   } = useStore();
 
   const centroids = useNeighborhoodCentroids();
@@ -373,6 +375,21 @@ export function SettingsView() {
             </a>{' '}
             contributors. Venue locations were resolved with OpenStreetMap and Nominatim.
           </p>
+        </section>
+
+        {/* Sign-off: the wordmark, and the story behind it. */}
+        <section className="sset sset--brand">
+          <button type="button" className="navrow" onClick={openAbout}>
+            <span className="navrow__main">
+              <strong>About this app</strong>
+              <span className="navrow__sub">
+                Why it exists, who to thank, and the small print.
+              </span>
+            </span>
+            <IconChevronRight width={18} height={18} className="navrow__chev" />
+          </button>
+
+          <Logo placement="settings" interactive />
         </section>
       </div>
     </div>

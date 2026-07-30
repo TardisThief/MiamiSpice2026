@@ -49,6 +49,7 @@ export function StoreProvider({ children }) {
   // Which meal the detail should open on, when it was reached via a meal shortcut.
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [toast, setToast] = useState(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   // Bumped whenever user-owned storage changes, to re-run the merge.
   const [revision, setRevision] = useState(0);
@@ -423,6 +424,9 @@ export function StoreProvider({ children }) {
     [updatePrefs, showToast],
   );
 
+  const openAbout = useCallback(() => setAboutOpen(true), []);
+  const closeAbout = useCallback(() => setAboutOpen(false), []);
+
   const openDetail = useCallback((id, meal = null) => {
     setSelectedId(id ? String(id) : null);
     setSelectedMeal(meal);
@@ -491,6 +495,9 @@ export function StoreProvider({ children }) {
     // ui
     toast,
     showToast,
+    aboutOpen,
+    openAbout,
+    closeAbout,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
