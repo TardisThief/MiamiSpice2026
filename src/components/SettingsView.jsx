@@ -14,7 +14,9 @@ import {
   IconAlert,
   IconCheck,
   IconChevronRight,
+  IconClose,
   IconRefresh,
+  IconSearch,
   IconTarget,
 } from './Icons.jsx';
 
@@ -50,6 +52,13 @@ export function SettingsView() {
 
   const centroids = useNeighborhoodCentroids();
   const [picking, setPicking] = useState(false);
+  const [hoodQuery, setHoodQuery] = useState('');
+
+  const visibleCentroids = useMemo(() => {
+    const needle = hoodQuery.trim().toLowerCase();
+    if (!needle) return centroids;
+    return centroids.filter((n) => n.name.toLowerCase().includes(needle));
+  }, [centroids, hoodQuery]);
 
   const needsWork = useMemo(() => {
     const c = meta?.tier_counts ?? {};
@@ -192,21 +201,50 @@ export function SettingsView() {
                 : 'Pick a neighborhood to sort by distance without granting location access.'}
             </p>
             {picking ? (
-              <div className="hoodpick">
-                {centroids.map((n) => (
-                  <button
-                    type="button"
-                    key={n.name}
-                    className="hoodpick__btn"
-                    onClick={() => {
-                      setManualLocation({ ...n.centroid, label: n.name });
-                      setPicking(false);
-                    }}
-                  >
-                    {n.name}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="search search--mini">
+                  <IconSearch className="search__icon" width={16} height={16} />
+                  <input
+                    className="search__input"
+                    type="search"
+                    value={hoodQuery}
+                    placeholder={`Search ${centroids.length} neighborhoods`}
+                    aria-label="Search neighborhoods"
+                    autoFocus
+                    onChange={(e) => setHoodQuery(e.target.value)}
+                  />
+                  {hoodQuery && (
+                    <button
+                      type="button"
+                      className="search__clear"
+                      onClick={() => setHoodQuery('')}
+                      aria-label="Clear neighborhood search"
+                    >
+                      <IconClose width={15} height={15} />
+                    </button>
+                  )}
+                </div>
+                <div className="hoodpick">
+                  {visibleCentroids.length === 0 ? (
+                    <p className="sset__hint">No neighborhood matches “{hoodQuery}”.</p>
+                  ) : (
+                    visibleCentroids.map((n) => (
+                      <button
+                        type="button"
+                        key={n.name}
+                        className="hoodpick__btn"
+                        onClick={() => {
+                          setManualLocation({ ...n.centroid, label: n.name });
+                          setPicking(false);
+                          setHoodQuery('');
+                        }}
+                      >
+                        {n.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </>
             ) : (
               <div className="sset__actions">
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPicking(true)}>

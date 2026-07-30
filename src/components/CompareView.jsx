@@ -235,10 +235,13 @@ function DishList({ items }) {
   );
 }
 
-/** Two picks: true side-by-side columns, aligned course by course. */
+/** True side-by-side columns, aligned course by course. */
 function MenuColumns({ records, courses, perRecord }) {
+  // One column per restaurant, however many there are — the caller only chooses
+  // this layout when there's width for them.
+  const style = { '--mcols-count': records.length };
   return (
-    <div className="mcols">
+    <div className="mcols" style={style}>
       <div className="mcols__head">
         {perRecord.map((entry) => (
           <div className="mcols__col" key={entry.record.id}>
@@ -337,9 +340,35 @@ function MenuAccordion({ courses }) {
   );
 }
 
+/**
+ * True when the viewport is wide enough for real side-by-side menu columns.
+ *
+ * The 2-vs-3+ layout switch exists because of phone width, not because of some
+ * inherent property of comparing three things. On a desktop there's room for four
+ * columns at ~250px each, so the constraint lifts and the better layout wins.
+ */
+function useWideEnoughForColumns(count) {
+  const query = `(min-width: ${count * 240 + 120}px)`;
+  const [wide, setWide] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.(query).matches,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return;
+    const onChange = (e) => setWide(e.matches);
+    setWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+
+  return wide;
+}
+
 function MenuSection({ records }) {
   const meals = useMemo(() => offeredMeals(records), [records]);
   const [meal, setMeal] = useState(() => bestSharedMeal(records));
+  const wideEnough = useWideEnoughForColumns(records.length);
 
   // Re-pick the default when the selection changes under us.
   useEffect(() => {
@@ -370,7 +399,7 @@ function MenuSection({ records }) {
 
       {!courses.length ? (
         <p className="cmp__none">None of these published a {MEAL_LABEL[meal] ?? meal} menu.</p>
-      ) : records.length === 2 ? (
+      ) : records.length === 2 || wideEnough ? (
         <MenuColumns records={records} courses={courses} perRecord={perRecord} />
       ) : (
         <MenuAccordion courses={courses} />
@@ -468,7 +497,7 @@ export function CompareView() {
 
   if (!compareRecords.length) {
     return (
-      <div className="view">
+      <div className="view view--cmp">
         <header className="topbar topbar--plain">
           <h1 className="topbar__title">Compare</h1>
         </header>
@@ -513,7 +542,7 @@ export function CompareView() {
   }
 
   return (
-    <div className="view">
+    <div className="view view--cmp">
       <header className="topbar topbar--plain">
         <h1 className="topbar__title">
           Compare <span className="topbar__count num">{compareRecords.length}</span>

@@ -152,6 +152,20 @@
   margin: 0 var(--s-4) var(--s-2);
 }
 
+.search--mini {
+  flex: 0 0 auto;
+  margin-bottom: var(--s-3);
+}
+
+.search--mini .search__input {
+  padding: 8px 32px 8px 34px;
+  font-size: var(--t-sm);
+}
+
+.search--mini .search__icon {
+  left: 10px;
+}
+
 .search__icon {
   position: absolute;
   left: 11px;
@@ -2051,7 +2065,7 @@
 .mcols__head,
 .mcols__row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(var(--mcols-count, 2), minmax(0, 1fr));
   gap: var(--s-3);
 }
 
@@ -2792,9 +2806,122 @@
 
 /* ============================================================ responsive === */
 
-/* Opened on a desktop: keep it readable rather than stretched. */
 @media (min-width: 720px) {
   .row {
     padding-inline: var(--s-5);
+  }
+
+  /* A bottom sheet pinned to the bottom of a 1080px-tall window is a phone
+     gesture stranded on a desktop. Centre it as a dialog instead. */
+  .sheet {
+    align-items: center;
+  }
+
+  .sheet__panel {
+    max-width: 40rem;
+    max-height: 86dvh;
+    border-radius: var(--r-xl);
+  }
+
+  .sheet__grip {
+    display: none;
+  }
+
+  .sheet__head {
+    padding-top: var(--s-4);
+  }
+}
+
+/*
+ * ---- Desktop: the bottom tab bar becomes a sidebar ----
+ *
+ * A bottom bar is a thumb-reach idiom. On a desktop the pointer is already
+ * anywhere on screen and vertical space is the scarce resource, so the nav moves
+ * to the left edge where it costs nothing and can carry full labels.
+ */
+@media (min-width: 900px) {
+  .app {
+    flex-direction: row;
+  }
+
+  .stage {
+    min-width: 0;
+  }
+
+  .tabbar {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    width: 13rem;
+    flex-shrink: 0;
+    padding: var(--s-4) var(--s-3);
+    border-top: none;
+    border-right: 1px solid var(--line);
+    /*
+     * `order` alone moves the nav to the left edge visually while leaving it last
+     * in the DOM, so screen readers and tab focus still reach the content first.
+     * (Pairing this with row-reverse would cancel it out and push the nav right.)
+     */
+    order: -1;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--s-3);
+    min-height: 44px;
+    padding: 0 var(--s-3);
+    border-radius: var(--r-md);
+  }
+
+  .tab__label {
+    font-size: var(--t-base);
+    font-weight: 500;
+  }
+
+  .tab.is-active {
+    background: var(--primary-soft);
+    color: var(--primary-soft-ink);
+  }
+
+  .tab:hover:not(.is-active) {
+    background: var(--surface-2);
+  }
+
+  .tab__badge {
+    position: static;
+    margin-left: auto;
+  }
+
+  /* More room for the content itself. */
+  .view {
+    max-width: 46rem;
+  }
+
+  .toast {
+    bottom: var(--s-6);
+  }
+
+  .recentre {
+    bottom: 34px;
+  }
+}
+
+/* Wide enough for the map and a reading column, and for four menu columns. */
+@media (min-width: 1200px) {
+  .view {
+    max-width: 52rem;
+  }
+
+  .view--cmp {
+    max-width: 68rem;
+  }
+
+  .cmp__sec,
+  .picks,
+  .shared,
+  .cmp__why {
+    margin-inline: auto;
   }
 }

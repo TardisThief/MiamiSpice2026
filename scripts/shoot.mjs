@@ -246,7 +246,7 @@ const tap = async (page, label) => {
   await page.waitForSelector('.row', { timeout: 20000 });
 
   // A query that matches nothing.
-  await page.locator('.search__input').fill('zzzzzz');
+  await page.getByLabel('Search restaurants').fill('zzzzzz');
   await page.waitForTimeout(600);
   await shot(page, '30-empty-search');
 

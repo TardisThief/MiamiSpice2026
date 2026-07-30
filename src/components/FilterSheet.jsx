@@ -6,7 +6,7 @@
  * ordered by how often they're reached for.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import {
   applyFilters,
@@ -16,12 +16,77 @@ import {
   neighborhoodOptions,
 } from '../lib/filters.js';
 import { Chip, Sheet } from './primitives.jsx';
+import { IconClose, IconSearch } from './Icons.jsx';
 import { DAYS, CONFIDENCE_META } from '../lib/dataset.js';
 import { STATUS_LABELS } from '../lib/storage.js';
 
 const STATUS_FILTERS = ['favorite', 'want_to_go', 'booked', 'been'];
 
 const CONFIDENCE_FILTERS = ['verified', 'poi_match', 'address_exact', 'approximate', 'neighborhood_only'];
+
+/**
+ * Neighborhood chooser with a filter box.
+ *
+ * There are 35 neighborhoods, which is more than anyone scans — and the names are
+ * long enough ("Miami Beach: South Beach") that the chip grid runs several rows
+ * deep. Typing two letters beats hunting. Selected neighborhoods always stay
+ * visible even when they don't match the search, so you can't lose track of what
+ * you've already picked.
+ */
+function NeighborhoodPicker({ options, selected, onToggle }) {
+  const [query, setQuery] = useState('');
+
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return options;
+    return options.filter(
+      (o) => o.name.toLowerCase().includes(needle) || selected.includes(o.name),
+    );
+  }, [options, query, selected]);
+
+  return (
+    <>
+      <div className="search search--mini">
+        <IconSearch className="search__icon" width={16} height={16} />
+        <input
+          className="search__input"
+          type="search"
+          value={query}
+          placeholder={`Search ${options.length} neighborhoods`}
+          aria-label="Search neighborhoods"
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {query && (
+          <button
+            type="button"
+            className="search__clear"
+            onClick={() => setQuery('')}
+            aria-label="Clear neighborhood search"
+          >
+            <IconClose width={15} height={15} />
+          </button>
+        )}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="fsec__hint">No neighborhood matches “{query}”.</p>
+      ) : (
+        <div className="fsec__chips">
+          {shown.map((h) => (
+            <Chip
+              key={h.name}
+              active={selected.includes(h.name)}
+              onClick={() => onToggle(h.name)}
+              count={h.count}
+            >
+              {h.name}
+            </Chip>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
 
 /**
  * @param {object} props
@@ -135,6 +200,17 @@ export function FilterSheet({ open, onClose, mode = 'filter', onConfirm }) {
         </div>
       </section>
 
+      {/* Above My list and Special: where you'll eat matters more than whether
+          you'd already bookmarked it. */}
+      <section className="fsec">
+        <h3 className="fsec__title">Neighborhood</h3>
+        <NeighborhoodPicker
+          options={hoods}
+          selected={filters.neighborhoods}
+          onToggle={(name) => toggle('neighborhoods', name)}
+        />
+      </section>
+
       <section className="fsec">
         <h3 className="fsec__title">My list</h3>
         <div className="fsec__chips">
@@ -158,39 +234,31 @@ export function FilterSheet({ open, onClose, mode = 'filter', onConfirm }) {
         </div>
       </section>
 
-      <section className="fsec">
-        <h3 className="fsec__title">Location confidence</h3>
-        <div className="fsec__chips">
-          {CONFIDENCE_FILTERS.map((c) => (
-            <Chip
-              key={c}
-              active={filters.confidence.includes(c)}
-              onClick={() => toggle('confidence', c)}
-            >
-              {CONFIDENCE_META[c]?.short ?? c}
-            </Chip>
-          ))}
-        </div>
-        <p className="fsec__hint">
-          Useful for finding pins worth checking, or for hiding the ones we couldn't place.
-        </p>
-      </section>
-
-      <section className="fsec">
-        <h3 className="fsec__title">Neighborhood</h3>
-        <div className="fsec__chips">
-          {hoods.map((h) => (
-            <Chip
-              key={h.name}
-              active={filters.neighborhoods.includes(h.name)}
-              onClick={() => toggle('neighborhoods', h.name)}
-              count={h.count}
-            >
-              {h.name}
-            </Chip>
-          ))}
-        </div>
-      </section>
+      {/*
+        Confidence is a browsing/maintenance filter, not something you'd reach for
+        when deciding where to eat — and the recommender already weighs pin quality
+        itself, so offering it here would be a second, confusing control over the
+        same thing.
+      */}
+      {!isRecommend && (
+        <section className="fsec">
+          <h3 className="fsec__title">Location confidence</h3>
+          <div className="fsec__chips">
+            {CONFIDENCE_FILTERS.map((c) => (
+              <Chip
+                key={c}
+                active={filters.confidence.includes(c)}
+                onClick={() => toggle('confidence', c)}
+              >
+                {CONFIDENCE_META[c]?.short ?? c}
+              </Chip>
+            ))}
+          </div>
+          <p className="fsec__hint">
+            Useful for hiding the ones we couldn't place.
+          </p>
+        </section>
+      )}
     </Sheet>
   );
 }

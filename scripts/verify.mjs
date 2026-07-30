@@ -203,7 +203,7 @@ await page.waitForTimeout(500);
 // Add three restaurants through the detail sheet, the real entry point.
 const picked = [];
 for (const q of ['Reunion', 'Hereford', 'Komodo']) {
-  await vis(page, '.search__input').fill(q);
+  await page.getByLabel('Search restaurants').fill(q);
   await page.waitForTimeout(500);
   if (!(await vis(page, '.row').count())) continue;
   await vis(page, '.row').first().click();
@@ -214,7 +214,7 @@ for (const q of ['Reunion', 'Hereford', 'Komodo']) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(350);
 }
-await vis(page, '.search__clear').click().catch(() => {});
+await page.getByLabel('Search restaurants').fill('');
 
 check('tab badge reflects the tray', (await page.locator('.tab__badge').textContent()) === '3', picked.join(', '));
 
