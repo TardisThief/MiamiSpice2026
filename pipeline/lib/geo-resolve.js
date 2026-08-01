@@ -29,6 +29,32 @@
 import { haversineMeters, inMiamiDade, NEIGHBORHOODS } from './neighborhoods.js';
 import { nameSimilarity } from './fuzzy.js';
 
+/**
+ * Which upstream each method actually consults.
+ *
+ * Independence is what makes corroboration mean anything, and method names are
+ * not a safe proxy for it. `nominatim_structured` and `nominatim_freetext` are
+ * two ways of phrasing a question to ONE service backed by ONE database — for
+ * La Brisa they returned the identical OSM object, 0 m apart, and that was being
+ * counted as two sources agreeing. It is one source asked twice.
+ *
+ * Overpass is kept separate from Nominatim despite both drawing on OSM: a named
+ * POI node matched by name and an address geocode are genuinely different
+ * objects, arrived at by different routes. Two ways of asking Nominatim for the
+ * same address are not.
+ */
+const PROVIDER_OF = {
+  listing_jsonld: 'miami_spice_listing',
+  overpass_poi: 'osm_overpass',
+  nominatim_structured: 'nominatim',
+  nominatim_freetext: 'nominatim',
+  venue_site: 'venue_own_page',
+  manual: 'human',
+  neighborhood_centroid: 'derived',
+};
+
+const providerOf = (method) => PROVIDER_OF[method] ?? method;
+
 /** Two sources this close together are treated as agreeing. */
 export const CORROBORATION_M = 150;
 
@@ -314,22 +340,52 @@ export function resolveCoordinate(record, candidates) {
    * hotel/mall polygon that is the venue's container rather than the venue — are
    * demoted so they can only win when nothing better exists.
    */
-  const support = (candidate) =>
+  const agrees = (a, b) => a !== b && haversineMeters(a, b) <= CORROBORATION_M;
+
+  /*
+   * Support is counted at two strengths, because WHICH COORDINATE TO PRINT and
+   * HOW SURE WE ARE are different questions and want different evidence bars.
+   *
+   * Cross-provider agreement is the strong kind, and the only kind that earns a
+   * confidence tier further down.
+   *
+   * Same-provider agreement is weak but not worthless: Nominatim answering a
+   * structured query and a free-text query with the same object means the
+   * geocoder is settled about that address. Counting it here — below the strong
+   * kind, above the priority table — is what stops the tie-break falling through
+   * to raw method rank. That fallback is not harmless: the Miami Spice listing
+   * outranks Nominatim in the table, so La Brisa reverted to the listing's
+   * coordinate 13.7 km out in the Everglades, in preference to a geocode of the
+   * resort's real street address.
+   */
+  const crossProvider = (candidate) =>
     usable.filter(
       (other) =>
-        other !== candidate &&
-        other.method !== candidate.method &&
-        haversineMeters(candidate, other) <= CORROBORATION_M,
+        agrees(candidate, other) &&
+        providerOf(other.method) !== providerOf(candidate.method),
+    ).length;
+
+  const sameProvider = (candidate) =>
+    usable.filter(
+      (other) =>
+        agrees(candidate, other) &&
+        providerOf(other.method) === providerOf(candidate.method),
     ).length;
 
   const unreliable = (c) =>
     c.method === 'overpass_poi' && (c.container_only || c.ambiguous) ? 1 : 0;
 
   const sorted = [...usable]
-    .map((c) => ({ c, support: support(c), unreliable: unreliable(c) }))
+    .map((c) => ({
+      c,
+      strong: crossProvider(c),
+      weak: sameProvider(c),
+      unreliable: unreliable(c),
+    }))
     .sort((a, b) => {
       if (a.unreliable !== b.unreliable) return a.unreliable - b.unreliable;
-      if (a.support !== b.support) return b.support - a.support;
+      if (a.strong !== b.strong) return b.strong - a.strong;
+      if (a.weak !== b.weak) return b.weak - a.weak;
       const pa = METHOD_PRIORITY[a.c.method] ?? 5;
       const pb = METHOD_PRIORITY[b.c.method] ?? 5;
       if (pa !== pb) return pa - pb;
@@ -340,7 +396,9 @@ export function resolveCoordinate(record, candidates) {
   const primary = sorted[0];
 
   // ---- Corroboration across DIFFERENT methods ----
-  const others = usable.filter((c) => c !== primary && c.method !== primary.method);
+  const others = usable.filter(
+    (c) => c !== primary && providerOf(c.method) !== providerOf(primary.method),
+  );
   const distances = others.map((c) => ({
     method: c.method,
     m: Math.round(haversineMeters(primary, c)),

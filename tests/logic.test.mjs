@@ -908,3 +908,60 @@ test('a building name is turned into a geocodable place query', async () => {
   // A lone city name is not a building.
   assert.equal(hostPropertyQuery('Miami, FL, 33131'), null);
 });
+
+/* --------------------------------------------- independence vs coordinate choice */
+
+test('one provider asked twice is not two corroborating sources', () => {
+  // Nominatim answering a structured and a free-text query with the SAME object
+  // is one source, however many method names it arrives under.
+  const res = resolveCoordinate(brickell, [
+    { method: 'nominatim_structured', lat: 25.7657, lng: -80.1899, precise: true },
+    { method: 'nominatim_freetext', lat: 25.7657, lng: -80.1899, precise: true },
+  ]);
+  assert.ok(
+    !res.geo_notes.some((n) => n.startsWith('corroborated')),
+    `should not claim corroboration, got: ${res.geo_notes.join(' / ')}`,
+  );
+});
+
+test('a settled geocode still beats the listing when they disagree', () => {
+  /*
+   * La Brisa's real shape: the listing's curated coordinate sits 13.7 km out in
+   * the Everglades, while Nominatim resolves the resort's street address the
+   * same way twice. Once same-provider agreement stopped counting for anything,
+   * the tie-break fell through to the priority table — where the listing
+   * outranks Nominatim — and the pin snapped back to the wrong place.
+   */
+  const laBrisa = {
+    id: 'lb',
+    name: 'La Brisa',
+    neighborhood: 'Southwest Miami-Dade',
+    address: 'Miccosukee Resort & Gaming, Miami, FL, 33194',
+  };
+  const res = resolveCoordinate(laBrisa, [
+    { method: 'listing_jsonld', lat: 25.7143625, lng: -80.610489, precise: true },
+    { method: 'nominatim_structured', lat: 25.7634818, lng: -80.4845623, precise: true },
+    { method: 'nominatim_freetext', lat: 25.7634818, lng: -80.4845623, precise: true },
+  ]);
+
+  assert.equal(res.geo_method, 'nominatim_structured');
+  assert.ok(Math.abs(res.lat - 25.7634818) < 1e-6, `lat was ${res.lat}`);
+
+  // ...but the disagreement is still reported, and it is still not "corroborated".
+  assert.ok(res.geo_flags.includes('source_disagreement'));
+  assert.equal(res.geo_confidence, 'approximate');
+  assert.ok(!res.geo_notes.some((n) => n.startsWith('corroborated')));
+});
+
+test('genuine cross-provider agreement outranks a same-provider pair', () => {
+  const res = resolveCoordinate(brickell, [
+    // One provider, twice, at point A.
+    { method: 'nominatim_structured', lat: 25.7800, lng: -80.1800, precise: true },
+    { method: 'nominatim_freetext', lat: 25.7800, lng: -80.1800, precise: true },
+    // Two genuinely different providers agreeing at point B.
+    { method: 'listing_jsonld', lat: 25.7657, lng: -80.1899, precise: true },
+    { method: 'venue_site', lat: 25.7658, lng: -80.1900, precise: true },
+  ]);
+  assert.ok(Math.abs(res.lat - 25.7657) < 1e-3, `picked ${res.lat}, wanted the corroborated pair`);
+  assert.ok(res.geo_notes.some((n) => n.startsWith('corroborated')));
+});
