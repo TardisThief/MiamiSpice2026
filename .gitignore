@@ -10,7 +10,16 @@ pipeline/geocache/
 
 # Pipeline intermediates and verification artifacts. `public/data/restaurants.json`
 # and `geocode-review.md` are the committed outputs; these are regenerable.
-pipeline/data/
+#
+# Written as `data/*` rather than `data/` on purpose: git does not descend into an
+# ignored directory, so a negation inside one can never match. Ignoring the
+# CONTENTS leaves the directory visible and lets the exception below work.
+pipeline/data/*
+
+# The seed file is not regenerable. It is hand-curated input — pages found by
+# searching for records the automatic sources could not place — and re-running the
+# pipeline without it silently loses that work and the pins it corrected.
+!pipeline/data/venue-seeds.json
 
 .DS_Store
 Thumbs.db

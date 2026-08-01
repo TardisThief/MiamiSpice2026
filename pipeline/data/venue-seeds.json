@@ -1,0 +1,54 @@
+{
+  "_readme": [
+    "Extra pages for records the automatic sources could not place, found by search.",
+    "",
+    "Only URLs live here. Every coordinate still comes out of the linked page's own",
+    "markup, through the same extractor and validators as every other source, so a",
+    "seeded record is no more trusted than any other. Nothing is transcribed by hand:",
+    "a coordinate typed in from a search result would be indistinguishable from an",
+    "invented one.",
+    "",
+    "Chosen for machine-readable schema.org geo that a server-side fetch can actually",
+    "read. Yelp, TripAdvisor, OpenTable and Toast all answer a bot with 403, so their",
+    "pages are useless here however good their data is.",
+    "",
+    "`checked` is the date the URL was confirmed to carry a geo block."
+  ],
+
+  "47528": {
+    "name": "Beauty and The Butcher",
+    "why": "listing and Nominatim disagree; venue site publishes no geo",
+    "checked": "2026-08-01",
+    "urls": ["https://www.theinfatuation.com/miami/reviews/beauty-and-the-butcher"]
+  },
+  "58421": {
+    "name": "Serafina",
+    "why": "listing and Nominatim disagree; venue site publishes no geo",
+    "checked": "2026-08-01",
+    "urls": ["https://www.theinfatuation.com/miami/reviews/serafina-downtown-miami"]
+  },
+  "62488": {
+    "name": "Flight West",
+    "why": "opened 2026, thin coverage; venue site is a splash page",
+    "checked": "2026-08-01",
+    "urls": ["https://www.theinfatuation.com/miami/reviews/flight-west"]
+  },
+  "54182": {
+    "name": "Taikin Asian Cuisine",
+    "why": "listing and Nominatim disagree",
+    "checked": "2026-08-01",
+    "urls": ["https://www.theinfatuation.com/miami/reviews/taikin"]
+  },
+  "3569": {
+    "name": "Nobu Miami",
+    "why": "inside the Eden Roc hotel; listing and Nominatim disagree",
+    "checked": "2026-08-01",
+    "urls": ["https://www.theinfatuation.com/miami/reviews/nobu-miami"]
+  },
+  "62411": {
+    "name": "San Lorenzo Miami",
+    "why": "the listing writes 620 SW 78th Street, but the venue is at 620 NE 78th St in Little River — the 33138 postcode agrees with NE. A third source settles which quadrant is right.",
+    "checked": "2026-08-01",
+    "urls": ["https://www.theinfatuation.com/miami/reviews/san-lorenzo"]
+  }
+}
