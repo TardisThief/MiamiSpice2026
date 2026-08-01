@@ -66,10 +66,25 @@ for (const width of WIDTHS) {
     const overflow = await page.evaluate(() => {
       const doc = document.documentElement;
       const bodyOverflow = doc.scrollWidth > doc.clientWidth + 1;
-      // Find the specific offenders, ignoring intentional scroll-x strips.
+
+      /*
+       * Something wider than the viewport is only a bug if nothing can scroll it.
+       * Tested by walking up for a real scrollport rather than by looking for a
+       * `.scroll-x` class: a class name is a promise, computed overflow is the
+       * fact, and the two drift apart the moment a component sets overflow in its
+       * own rule (which the compare table now does).
+       */
+      const inScroller = (el) => {
+        for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+          const ox = getComputedStyle(p).overflowX;
+          if (ox === 'auto' || ox === 'scroll') return true;
+        }
+        return false;
+      };
+
       const wide = [];
       for (const el of document.querySelectorAll('body *')) {
-        if (el.closest('.scroll-x') || el.closest('.leaflet-container')) continue;
+        if (el.closest('.leaflet-container') || inScroller(el)) continue;
         const r = el.getBoundingClientRect();
         if (r.width > 0 && r.right > doc.clientWidth + 1) {
           wide.push(`${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[0]}`);

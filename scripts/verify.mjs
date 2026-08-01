@@ -348,6 +348,64 @@ check(
   actions[2]?.hrefs[0] ?? 'none listed',
 );
 
+/*
+ * The frozen header is the whole reason the table owns the scrolling rather than
+ * the page: scroll down past the menus and the restaurant names must still be
+ * there to read the row against.
+ */
+const frozen = await page.evaluate(() => {
+  const wrap = document.querySelector('.pane:not([hidden]) .cmptbl-wrap');
+  const th = wrap.querySelector('thead th:nth-child(2)');
+  const before = Math.round(th.getBoundingClientRect().top);
+  wrap.scrollTop = 900;
+  return new Promise((resolve) =>
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const corner = wrap.querySelector('.cmptbl__corner');
+        wrap.scrollLeft = 400;
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() =>
+            resolve({
+              before,
+              after: Math.round(th.getBoundingClientRect().top),
+              wrapTop: Math.round(wrap.getBoundingClientRect().top),
+              scrolled: Math.round(wrap.scrollTop),
+              name: th.textContent.trim(),
+              // The corner must stay put on both axes and keep covering the
+              // header cells that slide underneath it.
+              cornerLeft: Math.round(corner.getBoundingClientRect().left),
+              wrapLeft: Math.round(wrap.getBoundingClientRect().left),
+              labelLeft: Math.round(
+                wrap.querySelector('tbody .cmptbl__label').getBoundingClientRect().left,
+              ),
+            }),
+          ),
+        );
+      }),
+    ),
+  );
+});
+check('the table scrolls, not the page', frozen.scrolled > 100, `scrollTop ${frozen.scrolled}`);
+check(
+  'restaurant names stay frozen at the top',
+  Math.abs(frozen.after - frozen.wrapTop) < 4,
+  `${frozen.name} at y=${frozen.after}, wrap at ${frozen.wrapTop}`,
+);
+check(
+  'the label column stays frozen at the left',
+  Math.abs(frozen.labelLeft - frozen.wrapLeft) < 4,
+);
+check(
+  'the corner cell covers both, so nothing bleeds under it',
+  Math.abs(frozen.cornerLeft - frozen.wrapLeft) < 4,
+);
+await page.evaluate(() => {
+  const wrap = document.querySelector('.pane:not([hidden]) .cmptbl-wrap');
+  wrap.scrollTop = 0;
+  wrap.scrollLeft = 0;
+});
+await page.waitForTimeout(300);
+
 // Sections collapse independently, taking their rows with them.
 await vis(page, '.cmptbl__sectionbtn').first().click();
 await page.waitForTimeout(300);
@@ -391,6 +449,59 @@ const setsExport = await page.evaluate(() => {
   return Object.values(sets)[0] ?? null;
 });
 check('named set stored with its name and members', setsExport?.name === 'Friday night' && setsExport?.ids?.length === 2);
+
+/* ------------------------------------------------- suggest picks the closest */
+
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^Compare$/ }) }).click();
+await page.waitForTimeout(600);
+await page.getByRole('button', { name: /Suggest/ }).click();
+await page.waitForTimeout(700);
+
+const sheetTitles = await page.locator('.sheet[open] .fsec__title').allTextContents();
+check(
+  'the recommend sheet offers cuisine too',
+  sheetTitles.includes('Cuisine'),
+  sheetTitles.join(' / '),
+);
+// Confidence stays out of recommend: it's a maintenance filter, not a mood.
+check('and still hides location confidence', !sheetTitles.includes('Location confidence'));
+
+const suggestLabel = (await page.locator('.sheet[open] .btn--primary').textContent()).trim();
+check(
+  'the button says it will take the closest four',
+  /^Closest 4 of \d+$/.test(suggestLabel),
+  suggestLabel,
+);
+
+await page.locator('.sheet[open] .btn--primary').click();
+await page.waitForTimeout(1400);
+
+// With no filters set, the whole roster is in play — so the four picked must be
+// the four nearest the origin in the entire dataset, not merely four good ones.
+const nearest = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.pane:not([hidden]) .cmptbl tbody tr')];
+  const dr = rows.find(
+    (r) => r.querySelector('.cmptbl__label')?.textContent?.trim() === 'Distance',
+  );
+  return {
+    picked: dr ? [...dr.querySelectorAll('.cmptbl__cell')].map((c) => c.textContent.trim()) : null,
+    why: document.querySelector('.pane:not([hidden]) .cmp__why')?.textContent?.trim() ?? '',
+  };
+});
+const miles = (nearest.picked ?? []).map((t) =>
+  t.includes('ft') ? parseFloat(t) / 5280 : parseFloat(t),
+);
+check(
+  'suggest fills the tray with four measured picks',
+  miles.length === 4 && miles.every(Number.isFinite),
+  (nearest.picked ?? []).join(', '),
+);
+check('all four are genuinely close', miles.every((m) => m < 1), `max ${Math.max(...miles)} mi`);
+check(
+  'and the screen says that is what it did',
+  /closest to you\.$/.test(nearest.why),
+  nearest.why,
+);
 
 /* -------------------------------------------------------------- PWA/offline */
 
@@ -590,14 +701,35 @@ console.log('\nshortcuts');
   await sp.keyboard.press('Escape');
   await sp.waitForTimeout(400);
 
+  const countNow = async () =>
+    Number((await sp.locator('.listbar__count').textContent()).split(' ')[0]);
+
+  const DAY_SELECT = '.selfilter__control[aria-label="Filter by day of the week"]';
+  const CUISINE_SELECT = '.selfilter__control[aria-label="Filter by cuisine"]';
+
   // Day dropdown narrows the list.
-  const total = Number((await sp.locator('.listbar__count').textContent()).split(' ')[0]);
-  await sp.selectOption('.dayselect__control', 'Tue');
+  const total = await countNow();
+  await sp.selectOption(DAY_SELECT, 'Tue');
   await sp.waitForTimeout(700);
-  const tue = Number((await sp.locator('.listbar__count').textContent()).split(' ')[0]);
+  const tue = await countNow();
   check('the day dropdown filters the list', tue > 0 && tue < total, `${total} -> ${tue} on Tuesday`);
-  await sp.selectOption('.dayselect__control', '');
+  await sp.selectOption(DAY_SELECT, '');
   await sp.waitForTimeout(500);
+
+  // Cuisine dropdown does too, and returns only that cuisine.
+  await sp.selectOption(CUISINE_SELECT, 'Japanese');
+  await sp.waitForTimeout(700);
+  const jp = await countNow();
+  check('the cuisine dropdown filters the list', jp > 0 && jp < total, `${total} -> ${jp} Japanese`);
+  const allJapanese = await sp.evaluate(() =>
+    [...document.querySelectorAll('.pane:not([hidden]) .row')]
+      .slice(0, 10)
+      .every((r) => /Japanese/.test(r.textContent)),
+  );
+  check('every cuisine-filtered row is that cuisine', allJapanese);
+  await sp.selectOption(CUISINE_SELECT, '');
+  await sp.waitForTimeout(500);
+  check('clearing the cuisine restores the list', (await countNow()) === total);
 
   check('no page errors', errs.length === 0, errs[0] ?? '');
   await ctx2.close();

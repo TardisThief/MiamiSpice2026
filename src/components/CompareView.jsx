@@ -78,6 +78,23 @@ function SharedHeadline({ records }) {
   );
 }
 
+/**
+ * Say how these four arrived, so the names don't appear unexplained.
+ *
+ * Distinguishes "we narrowed 40 down to 4" from "your filters only matched 4" —
+ * they're very different answers, and the second means widening the filters is
+ * the way to see more.
+ */
+function explainPicks({ consideredCount, pickedCount, orderedBy }) {
+  if (consideredCount <= pickedCount) {
+    return `Everything that matched your filters — ${pickedCount} of them.`;
+  }
+  if (orderedBy === 'distance') {
+    return `${consideredCount} matched your filters. These are the ${pickedCount} closest to you.`;
+  }
+  return `${consideredCount} matched your filters. Location is off, so these are the ${pickedCount} we can best place and price — turn location on to get the closest instead.`;
+}
+
 /* ----------------------------------------------------------- the macro table */
 
 /**
@@ -248,7 +265,7 @@ function CompareTable({ records, origin, onOpen }) {
   );
 
   return (
-    <div className="cmptbl-wrap scroll-x">
+    <div className="cmptbl-wrap">
       <table className="cmptbl">
         {/* Fixed layout with explicit widths: without it the browser sizes columns
             from content, and one long dish name makes a column twice its neighbour. */}
@@ -577,7 +594,13 @@ export function CompareView() {
         </div>
       </header>
 
-      <div className="list scroll-y">
+      {/*
+        Not a plain scroller: the table below is the scroll region, so the picks
+        and the shared-night headline stay put and the table's own frozen header
+        row can do its job. A page-level scroller would carry the column names
+        off the top of the screen along with everything else.
+      */}
+      <div className="cmp__body">
         {missing > 0 && (
           <p className="cmp__warn">
             {missing} restaurant{missing > 1 ? 's are' : ' is'} no longer in the Miami Spice list
@@ -606,12 +629,7 @@ export function CompareView() {
 
         {/* Say how these were chosen, so four names don't arrive unexplained. */}
         {recommendation && recommendation.pickedCount === compareRecords.length && (
-          <p className="cmp__why">
-            Picked {recommendation.pickedCount} of {recommendation.consideredCount} matches
-            {recommendation.hadOrigin ? ', nearest first' : ''}, favouring places we can place and
-            price
-            {recommendation.shared.length ? ' that share a night' : ''}.
-          </p>
+          <p className="cmp__why">{explainPicks(recommendation)}</p>
         )}
 
         {compareRecords.length === 1 ? (

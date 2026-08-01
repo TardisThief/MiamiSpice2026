@@ -357,43 +357,95 @@ test('an unparseable price stays null rather than being invented', () => {
   assert.deepEqual(folded.days_offered.dinner, ['Mon']);
 });
 
-test('recommendation prefers a set that shares a night over the top-scoring four', async () => {
-  const { recommendForCompare, sharedSlots } = await import('../src/lib/compare.js');
+const mkCandidate = (name, days, extra = {}) => ({
+  id: name,
+  name,
+  menus: [
+    { meal: 'dinner', price: 50, days, courses: [{ name: 'Appetizers', items: [{ name: 'x' }] }] },
+  ],
+  meals: [],
+  geo_confidence: 'poi_match',
+  price_tiers: { dinner: 50 },
+  ...extra,
+});
 
-  // Four "best" candidates by raw score that share nothing, plus a coherent set.
-  const mk = (name, days, extra = {}) => ({
-    id: name,
-    name,
-    menus: [{ meal: 'dinner', price: 50, days, courses: [{ name: 'Appetizers', items: [{ name: 'x' }] }] }],
-    meals: [],
-    geo_confidence: 'poi_match',
-    price_tiers: { dinner: 50 },
-    ...extra,
-  });
+test('once the filters are met, the closest four win', async () => {
+  const { recommendForCompare } = await import('../src/lib/compare.js');
 
   const candidates = [
-    // High score (very close) but each open a different single night.
-    mk('Near A', ['Mon'], { distance: 100, distanceTrusted: true }),
-    mk('Near B', ['Tue'], { distance: 200, distanceTrusted: true }),
-    mk('Near C', ['Wed'], { distance: 300, distanceTrusted: true }),
-    mk('Near D', ['Fri'], { distance: 400, distanceTrusted: true }),
-    // Slightly further, but all four share Thursday.
-    mk('Set A', ['Thu'], { distance: 900, distanceTrusted: true }),
-    mk('Set B', ['Thu'], { distance: 1000, distanceTrusted: true }),
-    mk('Set C', ['Thu'], { distance: 1100, distanceTrusted: true }),
-    mk('Set D', ['Thu'], { distance: 1200, distanceTrusted: true }),
+    mkCandidate('Near A', ['Mon'], { distance: 100, distanceTrusted: true }),
+    mkCandidate('Near B', ['Tue'], { distance: 200, distanceTrusted: true }),
+    mkCandidate('Near C', ['Wed'], { distance: 300, distanceTrusted: true }),
+    mkCandidate('Near D', ['Fri'], { distance: 400, distanceTrusted: true }),
+    // Further away, and they all share Thursday — which no longer buys them a place.
+    mkCandidate('Far A', ['Thu'], { distance: 900, distanceTrusted: true }),
+    mkCandidate('Far B', ['Thu'], { distance: 1000, distanceTrusted: true }),
+    mkCandidate('Far C', ['Thu'], { distance: 1100, distanceTrusted: true }),
+    mkCandidate('Far D', ['Thu'], { distance: 1200, distanceTrusted: true }),
   ];
 
-  const { picks, shared } = recommendForCompare(candidates, { lat: 25.78, lng: -80.13 });
+  const { picks, orderedBy } = recommendForCompare(candidates, { lat: 25.78, lng: -80.13 });
 
-  assert.equal(picks.length, 4);
-  assert.ok(shared.length > 0, 'the chosen four must share at least one slot');
+  assert.equal(orderedBy, 'distance');
   assert.deepEqual(
-    picks.map((p) => p.name).sort(),
-    ['Set A', 'Set B', 'Set C', 'Set D'],
-    'the coherent set wins over four closer but mutually incompatible places',
+    picks.map((p) => p.name),
+    ['Near A', 'Near B', 'Near C', 'Near D'],
+    'the four nearest win outright, in distance order',
   );
-  assert.deepEqual(sharedSlots(picks).map((s) => `${s.day} ${s.meal}`), ['Thu dinner']);
+});
+
+test('a centroid distance never counts as "closest"', async () => {
+  const { recommendForCompare } = await import('../src/lib/compare.js');
+
+  // The centroid record is nominally nearest, but its distance is to a
+  // neighborhood, not to a restaurant — ranking it first would be a fiction.
+  const candidates = [
+    mkCandidate('Centroid', ['Mon'], {
+      distance: 50,
+      distanceTrusted: false,
+      geo_confidence: 'neighborhood_only',
+    }),
+    mkCandidate('Real A', ['Mon'], { distance: 100, distanceTrusted: true }),
+    mkCandidate('Real B', ['Tue'], { distance: 200, distanceTrusted: true }),
+    mkCandidate('Real C', ['Wed'], { distance: 300, distanceTrusted: true }),
+    mkCandidate('Real D', ['Fri'], { distance: 400, distanceTrusted: true }),
+  ];
+
+  const { picks } = recommendForCompare(candidates, { lat: 25.78, lng: -80.13 });
+  assert.deepEqual(picks.map((p) => p.name), ['Real A', 'Real B', 'Real C', 'Real D']);
+});
+
+test('short of four trusted distances, the rest fill by usefulness', async () => {
+  const { recommendForCompare } = await import('../src/lib/compare.js');
+
+  const candidates = [
+    mkCandidate('Real A', ['Mon'], { distance: 100, distanceTrusted: true }),
+    mkCandidate('Real B', ['Tue'], { distance: 200, distanceTrusted: true }),
+    mkCandidate('Vague A', ['Wed'], { distance: 300, distanceTrusted: false }),
+    mkCandidate('Vague B', ['Fri'], { distance: 400, distanceTrusted: false }),
+    mkCandidate('Vague C', ['Sat'], { distance: 500, distanceTrusted: false }),
+  ];
+
+  const { picks } = recommendForCompare(candidates, { lat: 25.78, lng: -80.13 });
+  assert.equal(picks.length, 4);
+  // The two measurable ones lead; the rest are offered but not as "closest".
+  assert.deepEqual(picks.slice(0, 2).map((p) => p.name), ['Real A', 'Real B']);
+});
+
+test('with no location, "closest" is meaningless and the score decides', async () => {
+  const { recommendForCompare } = await import('../src/lib/compare.js');
+
+  const candidates = [
+    mkCandidate('A', ['Mon'], { distance: 100, distanceTrusted: true }),
+    mkCandidate('B', ['Tue'], { distance: 200, distanceTrusted: true }),
+    mkCandidate('C', ['Wed'], { distance: 300, distanceTrusted: true }),
+    mkCandidate('D', ['Fri'], { distance: 400, distanceTrusted: true }),
+    mkCandidate('E', ['Sat'], { distance: 500, distanceTrusted: true }),
+  ];
+
+  const { picks, orderedBy } = recommendForCompare(candidates, null);
+  assert.equal(orderedBy, 'score');
+  assert.equal(picks.length, 4);
 });
 
 test('recommendation avoids places we cannot place or price', async () => {
@@ -683,4 +735,54 @@ test('decoding never resurrects markup from plain text', () => {
 test('decoding tolerates non-strings', () => {
   assert.equal(decodeEntities(null), null);
   assert.equal(decodeEntities(undefined), undefined);
+});
+
+/* ------------------------------------------------------------ cuisine filter */
+
+test('cuisine filter matches exactly, and an unknown cuisine cannot satisfy it', async () => {
+  const { applyFilters, EMPTY_FILTERS, cuisineOptions } = await import('../src/lib/filters.js');
+
+  const mk = (name, cuisine) => ({
+    id: name,
+    name,
+    neighborhood: 'Brickell',
+    cuisine,
+    menus: [],
+    meals: [],
+    price_tiers: {},
+    geo_confidence: 'address_exact',
+    lat: 25.76,
+    lng: -80.19,
+  });
+
+  const rows = [mk('Sushi', 'Japanese'), mk('Trattoria', 'Italian'), mk('Mystery', null)];
+
+  const jp = applyFilters(rows, { ...EMPTY_FILTERS, cuisines: ['Japanese'] }, 'name', null);
+  assert.deepEqual(jp.map((r) => r.name), ['Sushi']);
+
+  // Two cuisines is a union, not an intersection.
+  const both = applyFilters(
+    rows,
+    { ...EMPTY_FILTERS, cuisines: ['Japanese', 'Italian'] },
+    'name',
+    null,
+  );
+  assert.deepEqual(both.map((r) => r.name), ['Sushi', 'Trattoria']);
+
+  // The uncategorised record is never swept into a category it didn't declare.
+  assert.ok(!jp.some((r) => r.name === 'Mystery'));
+  assert.equal(applyFilters(rows, EMPTY_FILTERS, 'name', null).length, 3);
+
+  // Options skip the record with no cuisine, and lead with the commonest.
+  const opts = cuisineOptions([...rows, mk('Sushi 2', 'Japanese')]);
+  assert.deepEqual(opts, [
+    { name: 'Japanese', count: 2 },
+    { name: 'Italian', count: 1 },
+  ]);
+});
+
+test('cuisine counts toward the active-filter badge', async () => {
+  const { countActiveFilters, EMPTY_FILTERS } = await import('../src/lib/filters.js');
+  assert.equal(countActiveFilters(EMPTY_FILTERS), 0);
+  assert.equal(countActiveFilters({ ...EMPTY_FILTERS, cuisines: ['Thai', 'Greek'] }), 2);
 });

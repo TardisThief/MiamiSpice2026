@@ -131,6 +131,16 @@ export function IconCalendar(p) {
   );
 }
 
+/** Fork and knife — the cuisine filter. */
+export function IconUtensils(p) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M7 3v7.5a2.5 2.5 0 0 0 5 0V3M9.5 10.5V21" />
+      <path d="M17.5 3c-1.4 1.4-2 3-2 5.5s.6 3 2 3.5V21" />
+    </svg>
+  );
+}
+
 export function IconPhone(p) {
   return (
     <svg {...base} {...p}>

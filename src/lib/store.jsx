@@ -7,7 +7,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchDataset, mergeDataset } from './dataset.js';
+import { DISTANCE_TRUSTED, fetchDataset, mergeDataset } from './dataset.js';
 import { applyFilters, EMPTY_FILTERS } from './filters.js';
 import {
   clearOverride,
@@ -264,9 +264,25 @@ export function StoreProvider({ children }) {
   const [compareIds, setCompareIds] = useState(() => loadCompare());
   const [compareSets, setCompareSets] = useState(() => loadCompareSets());
 
+  /*
+   * Annotated with distance here rather than taken raw from the dataset: the tray
+   * holds ids, so a record arriving via a saved set or a reload never went through
+   * applyFilters and would show "—" in the comparison's Distance row forever. The
+   * same trusted/untrusted rule applies as everywhere else — a centroid distance
+   * is marked, not quietly presented as a distance to the restaurant.
+   */
   const compareRecords = useMemo(
-    () => compareIds.map((id) => byId.get(String(id))).filter(Boolean),
-    [compareIds, byId],
+    () =>
+      compareIds
+        .map((id) => byId.get(String(id)))
+        .filter(Boolean)
+        .map((r) => ({
+          ...r,
+          distance:
+            origin && r.lat != null ? haversineMeters(origin, { lat: r.lat, lng: r.lng }) : null,
+          distanceTrusted: DISTANCE_TRUSTED.has(r.geo_confidence),
+        })),
+    [compareIds, byId, origin],
   );
 
   const isInCompare = useCallback(
@@ -322,7 +338,7 @@ export function StoreProvider({ children }) {
       origin,
       prefs.includeUnknownInDistance,
     );
-    const { picks, shared, consideredCount } = recommendForCompare(matches, origin);
+    const { picks, shared, consideredCount, orderedBy } = recommendForCompare(matches, origin);
 
     if (picks.length < 2) {
       showToast('Not enough matches to compare. Try widening the filters.', 'warn');
@@ -340,6 +356,7 @@ export function StoreProvider({ children }) {
       consideredCount,
       pickedCount: picks.length,
       shared,
+      orderedBy,
       hadOrigin: !!origin,
       at: Date.now(),
     });

@@ -264,28 +264,28 @@
   flex-shrink: 0;
 }
 
-.dayselect {
+.selfilter {
   position: relative;
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
 }
 
-.dayselect__icon {
+.selfilter__icon {
   position: absolute;
   left: 10px;
   color: var(--ink-2);
   pointer-events: none;
 }
 
-.dayselect__chev {
+.selfilter__chev {
   position: absolute;
   right: 8px;
   color: var(--ink-2);
   pointer-events: none;
 }
 
-.dayselect__control {
+.selfilter__control {
   appearance: none;
   min-height: 32px;
   padding: 6px 26px 6px 30px;
@@ -299,23 +299,23 @@
 }
 
 /*
- * Selected day reads as an active filter, matching the chips beside it.
+ * A chosen value reads as an active filter, matching the chips beside it.
  * Driven by a class, not [value=""]: React sets the select value as a DOM
  * property and never reflects it to an attribute, so an attribute selector
  * would silently never match.
  */
-.dayselect.is-active .dayselect__control {
+.selfilter.is-active .selfilter__control {
   background: var(--primary-soft);
   border-color: var(--primary);
   color: var(--primary-soft-ink);
 }
 
-.dayselect.is-active .dayselect__icon,
-.dayselect.is-active .dayselect__chev {
+.selfilter.is-active .selfilter__icon,
+.selfilter.is-active .selfilter__chev {
   color: var(--primary-soft-ink);
 }
 
-.dayselect__control:focus-visible {
+.selfilter__control:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -2296,12 +2296,34 @@
 
 /* ---- the macro comparison table ---- */
 
+/* The compare screen's fixed head, then the table as the one scroll region. */
+.cmp__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Only the table gives up height; the picks and headline keep theirs. */
+.cmp__body > *:not(.cmptbl-wrap) {
+  flex: 0 0 auto;
+}
+
+/*
+ * The table scrolls in BOTH axes, and it is the only thing on this screen that
+ * scrolls. That is what lets the header row and the label column freeze: sticky
+ * positions against the nearest scrollport, so if the page scrolled instead, the
+ * restaurant names would leave with it.
+ */
 .cmptbl-wrap {
-  margin: 0 var(--s-4) var(--s-6);
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 var(--s-4) var(--s-4);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  /* Both axes scroll inside this box, never the page. */
-  max-height: none;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* Fixed layout so column widths come from the <colgroup> and not from whichever
@@ -2360,8 +2382,16 @@
   border-bottom: 2px solid var(--line-strong);
 }
 
-.cmptbl__corner {
-  z-index: 4;
+/*
+ * The corner is sticky on BOTH axes, so it has to outrank the header row it sits
+ * in as well as the label column below it. Written as `thead th.cmptbl__corner`
+ * deliberately: a bare `.cmptbl__corner` loses to `.cmptbl thead th` on
+ * specificity, which left the corner at the header's own z-index — and since it
+ * is the first cell in the row, every restaurant name painted over it on a
+ * sideways scroll.
+ */
+.cmptbl thead th.cmptbl__corner {
+  z-index: 5;
 }
 
 .cmptbl__head {

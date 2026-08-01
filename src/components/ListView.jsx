@@ -19,6 +19,7 @@ import {
   applyFilters,
   availablePriceBuckets,
   countActiveFilters,
+  cuisineOptions,
   MEAL_OPTIONS,
   SORTS,
 } from '../lib/filters.js';
@@ -32,6 +33,7 @@ import {
   IconSearch,
   IconSliders,
   IconTarget,
+  IconUtensils,
 } from './Icons.jsx';
 import { DAYS } from '../lib/dataset.js';
 
@@ -80,11 +82,13 @@ export function ListView() {
   );
 
   const priceBuckets = useMemo(() => availablePriceBuckets(restaurants), [restaurants]);
+  const cuisines = useMemo(() => cuisineOptions(restaurants), [restaurants]);
   const activeCount = countActiveFilters(filters);
   const today = todayCode();
-  // A single selected day drives the dropdown; the filter sheet can still select
+  // A single selected value drives the dropdown; the filter sheet can still select
   // several, in which case the dropdown reports that rather than lying.
   const dayValue = filters.days.length === 1 ? filters.days[0] : '';
+  const cuisineValue = filters.cuisines.length === 1 ? filters.cuisines[0] : '';
 
   // Reset scroll when the result set changes, so a new filter starts at the top.
   const resultKey = `${deferredFilters.query}|${activeCount}|${sort}`;
@@ -148,11 +152,11 @@ export function ListView() {
           the platform picker is good at, it opens as a proper wheel on a phone,
           and it's keyboard- and screen-reader-correct for free.
         */}
-        <label className={`dayselect ${dayValue ? 'is-active' : ''}`}>
-          <span className="sr-only">Filter by day of the week</span>
-          <IconCalendar className="dayselect__icon" width={15} height={15} />
+        <label className={`selfilter ${dayValue ? 'is-active' : ''}`}>
+          <IconCalendar className="selfilter__icon" width={15} height={15} />
           <select
-            className="dayselect__control"
+            className="selfilter__control"
+            aria-label="Filter by day of the week"
             value={dayValue}
             onChange={(e) => {
               const v = e.target.value;
@@ -172,7 +176,36 @@ export function ListView() {
               </option>
             )}
           </select>
-          <IconChevronDown className="dayselect__chev" width={14} height={14} />
+          <IconChevronDown className="selfilter__chev" width={14} height={14} />
+        </label>
+
+        {/* Same treatment as days: 24 cuisines is exactly what a platform picker
+            handles well, and it costs one control's worth of chip row instead of
+            twenty-four. The sheet still offers multi-select. */}
+        <label className={`selfilter ${cuisineValue ? 'is-active' : ''}`}>
+          <IconUtensils className="selfilter__icon" width={15} height={15} />
+          <select
+            className="selfilter__control"
+            aria-label="Filter by cuisine"
+            value={cuisineValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              setFilters((f) => ({ ...f, cuisines: v ? [v] : [] }));
+            }}
+          >
+            <option value="">Any cuisine</option>
+            {cuisines.map((c) => (
+              <option key={c.name} value={c.name}>
+                {c.name} ({c.count})
+              </option>
+            ))}
+            {filters.cuisines.length > 1 && (
+              <option value="" disabled>
+                {filters.cuisines.length} cuisines selected
+              </option>
+            )}
+          </select>
+          <IconChevronDown className="selfilter__chev" width={14} height={14} />
         </label>
 
         {MEAL_OPTIONS.map((m) => (

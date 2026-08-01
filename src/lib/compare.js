@@ -220,62 +220,72 @@ function candidateScore(record, origin) {
 /**
  * Pick a set of restaurants worth comparing.
  *
- * The naive version — take the top N by score — often returns four places with no
- * night in common, which is useless for the question Compare exists to answer. So
- * this scores candidates, keeps a shortlist of the best, then searches that
- * shortlist for the SUBSET whose shared availability is greatest, breaking ties on
- * score. With a 16-candidate shortlist that's at most 1,820 combinations, which is
- * nothing, and it means the suggestion is a group you can actually all go to.
+ * Once the filters have said what you're in the mood for, anything still standing
+ * already qualifies — so the tie-break between them is simply which ones you can
+ * get to. If more than `size` candidates survive, the nearest `size` win.
+ *
+ * "Nearest" only counts a distance we actually trust. A distance measured from a
+ * neighborhood centroid is a distance to a neighborhood, not to a restaurant, and
+ * ranking it against real ones would quietly reorder the list on made-up numbers.
+ * Those, and anything we couldn't place at all, fill any remaining slots by the
+ * usefulness score instead — they are still offered, just never presented as
+ * "closest".
+ *
+ * With no origin — location off or denied — "closest" has no meaning, so the
+ * score decides and `orderedBy` reports 'score' so the UI can say so.
  *
  * @param {Array} candidates  Already filtered and distance-annotated.
  * @param {object|null} origin
  * @param {object} [opts]
- * @returns {{picks: Array, shared: Array, consideredCount: number}}
+ * @returns {{picks: Array, shared: Array, consideredCount: number, orderedBy: 'distance'|'score'}}
  */
-export function recommendForCompare(candidates, origin, { size = MAX_COMPARE, shortlist = 16 } = {}) {
-  const ranked = [...candidates]
-    .map((r) => ({ r, score: candidateScore(r, origin) }))
-    .sort((a, b) => b.score - a.score || a.r.name.localeCompare(b.r.name, 'en'));
+export function recommendForCompare(candidates, origin, { size = MAX_COMPARE } = {}) {
+  const byName = (a, b) => a.name.localeCompare(b.name, 'en');
+  const scored = [...candidates].sort(
+    (a, b) => candidateScore(b, origin) - candidateScore(a, origin) || byName(a, b),
+  );
 
-  const pool = ranked.slice(0, Math.max(shortlist, size)).map((x) => x.r);
-  const scoreOf = new Map(ranked.map((x) => [x.r.id, x.score]));
-
-  if (pool.length <= size) {
-    return { picks: pool, shared: sharedSlots(pool), consideredCount: candidates.length };
+  if (candidates.length <= size) {
+    return {
+      picks: scored,
+      shared: sharedSlots(scored),
+      consideredCount: candidates.length,
+      orderedBy: origin ? 'distance' : 'score',
+    };
   }
 
-  const slotSets = new Map(pool.map((r) => [r.id, slotsFor(r)]));
+  if (!origin) {
+    const picks = scored.slice(0, size);
+    return {
+      picks,
+      shared: sharedSlots(picks),
+      consideredCount: candidates.length,
+      orderedBy: 'score',
+    };
+  }
 
-  let best = null;
-  const combo = [];
+  const measurable = (r) => r.distance != null && r.distanceTrusted;
+  const near = candidates
+    .filter(measurable)
+    .sort((a, b) => a.distance - b.distance || byName(a, b));
 
-  const walk = (start) => {
-    if (combo.length === size) {
-      // Intersect the chosen sets.
-      let shared = null;
-      for (const r of combo) {
-        const s = slotSets.get(r.id);
-        shared = shared === null ? new Set(s) : new Set([...shared].filter((k) => s.has(k)));
-        if (!shared.size) break;
-      }
-      const sharedCount = shared ? shared.size : 0;
-      const total = combo.reduce((n, r) => n + (scoreOf.get(r.id) ?? 0), 0);
-      if (!best || sharedCount > best.sharedCount || (sharedCount === best.sharedCount && total > best.total)) {
-        best = { picks: [...combo], sharedCount, total };
-      }
-      return;
+  const picks = near.slice(0, size);
+
+  // Short of a full set only when fewer than `size` have a distance we trust.
+  if (picks.length < size) {
+    const taken = new Set(picks.map((r) => r.id));
+    for (const r of scored) {
+      if (picks.length === size) break;
+      if (!taken.has(r.id)) picks.push(r);
     }
-    for (let i = start; i < pool.length; i++) {
-      combo.push(pool[i]);
-      walk(i + 1);
-      combo.pop();
-    }
+  }
+
+  return {
+    picks,
+    shared: sharedSlots(picks),
+    consideredCount: candidates.length,
+    orderedBy: 'distance',
   };
-
-  walk(0);
-
-  const picks = best?.picks ?? pool.slice(0, size);
-  return { picks, shared: sharedSlots(picks), consideredCount: candidates.length };
 }
 
 /** Human phrasing for the shared-availability headline. */

@@ -11,6 +11,7 @@ import { DISTANCE_TRUSTED, allDays, mealsOffered, priceList } from './dataset.js
 export const EMPTY_FILTERS = {
   query: '',
   neighborhoods: [],
+  cuisines: [],
   priceTiers: [],
   meals: [],
   days: [],
@@ -48,6 +49,7 @@ export const SORTS = [
 export function countActiveFilters(f) {
   return (
     f.neighborhoods.length +
+    f.cuisines.length +
     f.priceTiers.length +
     f.meals.length +
     f.days.length +
@@ -114,6 +116,10 @@ export function applyFilters(
     (r) =>
       matchesQuery(r, f.query) &&
       (!f.neighborhoods.length || f.neighborhoods.includes(r.neighborhood)) &&
+      // 10 of the 351 publish no cuisine at all; like price, an unknown can't
+      // satisfy a cuisine filter, so they drop out rather than being guessed into
+      // a category.
+      (!f.cuisines.length || (r.cuisine != null && f.cuisines.includes(r.cuisine))) &&
       matchesPrice(r, f.priceTiers) &&
       matchesMeals(r, f.meals) &&
       matchesDays(r, f.days) &&
@@ -193,4 +199,24 @@ export function neighborhoodOptions(restaurants) {
   return [...counts.entries()]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => a.name.localeCompare(b.name, 'en'));
+}
+
+/**
+ * Cuisines present in the data, with counts.
+ *
+ * Ordered by count rather than alphabetically: the source uses 24 labels whose
+ * sizes run from Italian (59) to Vietnamese (1), so the common ones first is what
+ * you actually want to see before you start typing. Taken verbatim from the
+ * source — merging "Pan-Asian" into "Chinese" or "Japanese" would be us inventing
+ * a taxonomy the restaurants didn't choose.
+ */
+export function cuisineOptions(restaurants) {
+  const counts = new Map();
+  for (const r of restaurants) {
+    if (!r.cuisine) continue;
+    counts.set(r.cuisine, (counts.get(r.cuisine) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'en'));
 }

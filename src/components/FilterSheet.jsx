@@ -12,9 +12,11 @@ import {
   applyFilters,
   availablePriceBuckets,
   countActiveFilters,
+  cuisineOptions,
   MEAL_OPTIONS,
   neighborhoodOptions,
 } from '../lib/filters.js';
+import { MAX_COMPARE } from '../lib/compare.js';
 import { Chip, Sheet } from './primitives.jsx';
 import { IconClose, IconSearch } from './Icons.jsx';
 import { DAYS, CONFIDENCE_META } from '../lib/dataset.js';
@@ -25,15 +27,15 @@ const STATUS_FILTERS = ['favorite', 'want_to_go', 'booked', 'been'];
 const CONFIDENCE_FILTERS = ['verified', 'poi_match', 'address_exact', 'approximate', 'neighborhood_only'];
 
 /**
- * Neighborhood chooser with a filter box.
+ * A chip grid with a search box in front of it.
  *
- * There are 35 neighborhoods, which is more than anyone scans — and the names are
- * long enough ("Miami Beach: South Beach") that the chip grid runs several rows
- * deep. Typing two letters beats hunting. Selected neighborhoods always stay
- * visible even when they don't match the search, so you can't lose track of what
- * you've already picked.
+ * Used for the two long lists: 35 neighborhoods and 24 cuisines. Both are more
+ * than anyone scans, and neighborhood names are long enough ("Miami Beach: South
+ * Beach") that the grid runs several rows deep — typing two letters beats
+ * hunting. Selected values always stay visible even when they don't match the
+ * search, so you can't lose track of what you've already picked.
  */
-function NeighborhoodPicker({ options, selected, onToggle }) {
+function SearchablePicker({ options, selected, onToggle, noun, plural }) {
   const [query, setQuery] = useState('');
 
   const shown = useMemo(() => {
@@ -52,8 +54,8 @@ function NeighborhoodPicker({ options, selected, onToggle }) {
           className="search__input"
           type="search"
           value={query}
-          placeholder={`Search ${options.length} neighborhoods`}
-          aria-label="Search neighborhoods"
+          placeholder={`Search ${options.length} ${plural}`}
+          aria-label={`Search ${plural}`}
           onChange={(e) => setQuery(e.target.value)}
         />
         {query && (
@@ -61,7 +63,7 @@ function NeighborhoodPicker({ options, selected, onToggle }) {
             type="button"
             className="search__clear"
             onClick={() => setQuery('')}
-            aria-label="Clear neighborhood search"
+            aria-label={`Clear ${noun} search`}
           >
             <IconClose width={15} height={15} />
           </button>
@@ -69,7 +71,7 @@ function NeighborhoodPicker({ options, selected, onToggle }) {
       </div>
 
       {shown.length === 0 ? (
-        <p className="fsec__hint">No neighborhood matches “{query}”.</p>
+        <p className="fsec__hint">No {noun} matches “{query}”.</p>
       ) : (
         <div className="fsec__chips">
           {shown.map((h) => (
@@ -101,6 +103,11 @@ export function FilterSheet({ open, onClose, mode = 'filter', onConfirm }) {
   const { restaurants, filters, setFilters, resetFilters, sort, origin, prefs } = useStore();
 
   const hoods = useMemo(() => neighborhoodOptions(restaurants), [restaurants]);
+  const cuisines = useMemo(() => cuisineOptions(restaurants), [restaurants]);
+  const uncategorised = useMemo(
+    () => restaurants.filter((r) => !r.cuisine).length,
+    [restaurants],
+  );
   const priceBuckets = useMemo(() => availablePriceBuckets(restaurants), [restaurants]);
   const activeCount = countActiveFilters(filters);
 
@@ -147,7 +154,9 @@ export function FilterSheet({ open, onClose, mode = 'filter', onConfirm }) {
             {isRecommend
               ? matchCount < 2
                 ? 'Not enough matches'
-                : `Pick 4 from ${matchCount}`
+                : matchCount <= MAX_COMPARE
+                  ? `Compare all ${matchCount}`
+                  : `${origin ? 'Closest' : 'Best'} ${MAX_COMPARE} of ${matchCount}`
               : 'Show results'}
           </button>
         </div>
@@ -155,9 +164,10 @@ export function FilterSheet({ open, onClose, mode = 'filter', onConfirm }) {
     >
       {isRecommend && (
         <p className="fsec__hint fsec__hint--lead">
-          Narrow it however you like, then we'll pick four worth comparing — closest
-          first, skipping anything we can't place or price, and favouring a set that
-          shares a night so you can actually all go together.
+          Narrow it however you like. If more than {MAX_COMPARE} still match, we'll take the{' '}
+          {origin
+            ? `${MAX_COMPARE} closest to you.`
+            : `${MAX_COMPARE} we can best place and price — turn location on and we'll take the closest instead.`}
         </p>
       )}
       <section className="fsec">
@@ -204,11 +214,29 @@ export function FilterSheet({ open, onClose, mode = 'filter', onConfirm }) {
           you'd already bookmarked it. */}
       <section className="fsec">
         <h3 className="fsec__title">Neighborhood</h3>
-        <NeighborhoodPicker
+        <SearchablePicker
           options={hoods}
           selected={filters.neighborhoods}
           onToggle={(name) => toggle('neighborhoods', name)}
+          noun="neighborhood"
+          plural="neighborhoods"
         />
+      </section>
+
+      <section className="fsec">
+        <h3 className="fsec__title">Cuisine</h3>
+        <SearchablePicker
+          options={cuisines}
+          selected={filters.cuisines}
+          onToggle={(name) => toggle('cuisines', name)}
+          noun="cuisine"
+          plural="cuisines"
+        />
+        <p className="fsec__hint">
+          Cuisines are the source's own labels.
+          {uncategorised > 0 &&
+            ` The ${uncategorised} restaurants that don't publish one are hidden while a cuisine filter is on.`}
+        </p>
       </section>
 
       <section className="fsec">
