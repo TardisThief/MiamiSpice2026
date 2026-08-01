@@ -704,31 +704,87 @@ console.log('\nshortcuts');
   const countNow = async () =>
     Number((await sp.locator('.listbar__count').textContent()).split(' ')[0]);
 
-  const DAY_SELECT = '.selfilter__control[aria-label="Filter by day of the week"]';
-  const CUISINE_SELECT = '.selfilter__control[aria-label="Filter by cuisine"]';
+  const openPicker = async (which) => {
+    await sp.getByRole('button', { name: new RegExp(`^Filter by ${which}`) }).click();
+    await sp.waitForSelector('.msel', { timeout: 5000 });
+  };
+  const pickRow = async (label) => {
+    await sp.locator('.msel__row', { hasText: label }).first().click();
+    await sp.waitForTimeout(600);
+  };
 
-  // Day dropdown narrows the list.
+  // Day picker narrows the list, and two days are a union rather than an
+  // intersection — nothing serves Tuesday AND Wednesday exclusively.
   const total = await countNow();
-  await sp.selectOption(DAY_SELECT, 'Tue');
-  await sp.waitForTimeout(700);
+  await openPicker('day');
+  await pickRow('Tuesday');
   const tue = await countNow();
-  check('the day dropdown filters the list', tue > 0 && tue < total, `${total} -> ${tue} on Tuesday`);
-  await sp.selectOption(DAY_SELECT, '');
+  check('the day picker filters the list', tue > 0 && tue < total, `${total} -> ${tue} on Tuesday`);
+  await pickRow('Wednesday');
+  const tueWed = await countNow();
+  check(
+    'a second day widens the result, not narrows it',
+    tueWed >= tue && tueWed < total,
+    `${tue} -> ${tueWed} for Tue or Wed`,
+  );
+  check(
+    'the pill reports the count once past one',
+    (await sp.getByRole('button', { name: /^Filter by day/ }).textContent()).includes('2 days'),
+  );
+  await sp.locator('.msel__clear').click();
   await sp.waitForTimeout(500);
+  check('clearing the day picker restores the list', (await countNow()) === total);
+  await sp.locator('.msel__done').click();
+  await sp.waitForTimeout(300);
+  check('Done closes the picker', (await sp.locator('.msel').count()) === 0);
 
-  // Cuisine dropdown does too, and returns only that cuisine.
-  await sp.selectOption(CUISINE_SELECT, 'Japanese');
-  await sp.waitForTimeout(700);
+  // Cuisine picker: searchable, multi-select, and exact about what it returns.
+  await openPicker('cuisine');
+  check('the cuisine picker has a search box', (await sp.locator('.msel__input').count()) === 1);
+  await sp.locator('.msel__input').fill('ja');
+  await sp.waitForTimeout(400);
+  await pickRow('Japanese');
   const jp = await countNow();
-  check('the cuisine dropdown filters the list', jp > 0 && jp < total, `${total} -> ${jp} Japanese`);
+  check('the cuisine picker filters the list', jp > 0 && jp < total, `${total} -> ${jp} Japanese`);
   const allJapanese = await sp.evaluate(() =>
     [...document.querySelectorAll('.pane:not([hidden]) .row')]
       .slice(0, 10)
       .every((r) => /Japanese/.test(r.textContent)),
   );
   check('every cuisine-filtered row is that cuisine', allJapanese);
-  await sp.selectOption(CUISINE_SELECT, '');
+
+  // A search must never hide something you have already ticked, or you cannot
+  // untick it without clearing the box first.
+  await sp.locator('.msel__input').fill('ital');
+  await sp.waitForTimeout(400);
+  const stillListed = await sp.locator('.msel__rowlabel').allTextContents();
+  check('a chosen value stays listed through a search', stillListed.includes('Japanese'), stillListed.join(', '));
+  await pickRow('Italian');
+  const jpIt = await countNow();
+  check('two cuisines are a union', jpIt > jp, `${jp} -> ${jpIt} Japanese or Italian`);
+
+  // Dismissing the panel must not also activate whatever sits underneath it.
+  await sp.mouse.click(200, 700);
   await sp.waitForTimeout(500);
+  check('clicking away closes the picker', (await sp.locator('.msel').count()) === 0);
+  check('and does not open the row underneath', (await sp.locator('.sheet[open]').count()) === 0);
+
+  // The sheet and the pills are two views of one filter state.
+  await sp.locator('.filter-btn').click();
+  await sp.waitForTimeout(600);
+  const activeChips = await sp.locator('.sheet[open] .chip--active').allTextContents();
+  check(
+    'the filter sheet agrees with the pills',
+    activeChips.some((t) => t.startsWith('Japanese')) && activeChips.some((t) => t.startsWith('Italian')),
+    activeChips.join(', '),
+  );
+  await sp.keyboard.press('Escape');
+  await sp.waitForTimeout(400);
+  await openPicker('cuisine');
+  await sp.locator('.msel__clear').click();
+  await sp.waitForTimeout(400);
+  await sp.locator('.msel__done').click();
+  await sp.waitForTimeout(400);
   check('clearing the cuisine restores the list', (await countNow()) === total);
 
   check('no page errors', errs.length === 0, errs[0] ?? '');

@@ -39,6 +39,30 @@ const OVERPASS_THROTTLE_MS = 8000;
 const VIEWBOX = '-80.87,25.98,-80.10,25.13'; // west,north,east,south
 
 /**
+ * Drop the unit designator from a street line.
+ *
+ * "5335 NW 87th Ave., Suite C102" resolves to nothing at Nominatim, while "5335
+ * NW 87th Ave." resolves cleanly — the suite is a detail of the building's
+ * interior, which the street network does not model. Returns null when there was
+ * nothing to strip, so callers can skip a duplicate request.
+ */
+export function streetWithoutUnit(street) {
+  if (!street) return null;
+  const cleaned = street
+    .replace(
+      // "Suite C102", "Ste. 4", "Suite #16", or a bare "#16" at the end.
+      /[,;]?\s*(?:\b(?:suite|ste|unit|apt|apartment|floor|fl)\b\.?\s*#?\s*[\w-]*|#\s*[\w-]+)\.?\s*$/i,
+      '',
+    )
+    .replace(/[,\s]+$/, '')
+    .trim();
+  if (!cleaned || cleaned === street.trim()) return null;
+  // Refuse to hand back something that is no longer an address.
+  if (!/\d/.test(cleaned)) return null;
+  return cleaned;
+}
+
+/**
  * Structured Nominatim query (cascade #1). Passing components separately is
  * materially more accurate than one free-text blob.
  *
@@ -161,7 +185,10 @@ out center tags;`;
     throw err;
   }
 
-  const elements = json?.elements ?? [];
+  return toPois(json?.elements ?? []);
+}
+
+function toPois(elements) {
   const out = [];
   for (const el of elements) {
     const lat = el.lat ?? el.center?.lat;
@@ -177,4 +204,67 @@ out center tags;`;
     });
   }
   return out;
+}
+
+/**
+ * Every named feature within `radiusM` of a point — the targeted second look.
+ *
+ * The batched neighborhood query is the right default: 35 bbox queries instead
+ * of 351 name queries, and re-running the matcher costs nothing. But it misses
+ * two whole classes of venue. Its bboxes are drawn per neighborhood, so anything
+ * near an edge — or in a neighborhood whose bbox is drawn tight — falls outside;
+ * and its amenity filter is deliberately narrow, so a restaurant OSM tagged only
+ * as `shop=deli` or as part of a `tourism=attraction` never appears at all.
+ *
+ * This asks a different question: not "what food POIs are in this area?" but
+ * "what is called anything, right here?". Run only for records that finished the
+ * first pass without a confident pin — roughly 60 of 351 — so the extra load is
+ * small and bounded.
+ *
+ * No amenity filter is applied on purpose. Precision comes from the name match
+ * and from `matchOverpassPoi`, which already demotes a non-food match to a
+ * container rather than treating it as the venue itself.
+ */
+export async function overpassAround(lat, lng, radiusM = 400, { refresh = false, onRetry = null } = {}) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+
+  const around = `${Math.round(radiusM)},${lat.toFixed(6)},${lng.toFixed(6)}`;
+  const query = `[out:json][timeout:45];
+nwr["name"](around:${around});
+out center tags;`;
+
+  const cacheFile = `geocache/overpass-around/${hashKey(query)}.json`;
+
+  let json = null;
+  let lastError = null;
+
+  for (const mirror of OVERPASS_MIRRORS) {
+    const url = `${mirror}?data=${encodeURIComponent(query)}`;
+    try {
+      ({ json } = await fetchCachedJson(url, {
+        cacheFile,
+        refresh,
+        throttleMs: OVERPASS_THROTTLE_MS,
+        hostKey: 'overpass',
+        retries: 2,
+        backoffMs: 8000,
+        timeoutMs: 60000,
+        onRetry: onRetry ? (msg) => onRetry(`${new URL(mirror).host}: ${msg}`) : null,
+      }));
+      if (json?.elements) break;
+      lastError = new Error('response had no elements');
+    } catch (e) {
+      lastError = e;
+      onRetry?.(`${new URL(mirror).host} failed (${e.message})`);
+    }
+  }
+
+  // A failure here is not fatal — this is a bonus pass over records that already
+  // have an honest, if imprecise, answer. They simply keep it.
+  if (!json?.elements) {
+    onRetry?.(`targeted lookup unavailable: ${lastError?.message ?? 'unknown'}`);
+    return [];
+  }
+
+  return toPois(json.elements);
 }

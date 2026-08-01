@@ -25,8 +25,11 @@ import { ROOT } from './lib/http.js';
 import {
   nominatimStructured,
   nominatimFreeText,
+  overpassAround,
   overpassNeighborhoodPois,
+  streetWithoutUnit,
 } from './lib/geo-providers.js';
+import { haversineMeters } from './lib/neighborhoods.js';
 import {
   validateNominatimResult,
   validateRawCoordinate,
@@ -38,7 +41,189 @@ import { isMain, parseArgs } from './lib/cli.js';
 
 const DATA_DIR = path.join(ROOT, 'data');
 
-export async function run({ refresh = false, limit = null } = {}) {
+/** Ordered worst to best, so a change of tier can be described as a direction. */
+const TIER_ORDER = [
+  'unknown',
+  'neighborhood_only',
+  'approximate',
+  'address_exact',
+  'poi_match',
+  'verified',
+];
+const tierRank = (t) => TIER_ORDER.indexOf(t);
+
+/** How far from the incumbent pin a targeted POI search will look. */
+const TARGETED_RADIUS_M = 400;
+
+/**
+ * How far a POI from the pooled set may sit from the incumbent pin and still be
+ * considered the same venue. Generous enough to cover a listing coordinate that
+ * points at a hotel's front door while the POI sits at the restaurant inside,
+ * tight enough that a same-named branch in another neighborhood cannot match.
+ */
+const POOLED_POI_RADIUS_M = 1200;
+
+/**
+ * A second, narrower look at the records the first pass could not place well.
+ *
+ * The first pass asks broad questions — every food POI in a neighborhood bbox,
+ * the address as the source wrote it. That leaves two recurring gaps:
+ *
+ *   - A record is only ever matched against the POIs of the neighborhood the
+ *     source filed it under. A venue near a boundary has its OSM node sitting in
+ *     the neighbouring bbox's results, already on disk, and never gets compared
+ *     against it.
+ *   - Addresses carrying a suite number. "5335 NW 87th Ave., Suite C102"
+ *     resolves to nothing; the same line without the suite resolves cleanly.
+ *
+ * So for these records only, ask again — against the pooled POIs from every
+ * neighborhood, and with the unit stripped from the address. Both answers go
+ * back through the SAME resolver as everything else: this pass gathers evidence,
+ * it does not grant tiers. A record that gets no new evidence keeps exactly what
+ * it had.
+ */
+async function targetedPass(resolved, candidatesById, allPois, { refresh = false, network = false } = {}) {
+  const weak = resolved.filter((r) => tierRank(r.geo_confidence) < tierRank('address_exact'));
+  console.log(`\ntargeted second look at ${weak.length} weakly-placed records...`);
+  console.log(`  pooled POIs available: ${allPois.length}${network ? '' : '  (network lookups off)'}`);
+
+  const movements = [];
+  let pooledHits = 0;
+  let overpassHits = 0;
+  let nominatimHits = 0;
+
+  for (let i = 0; i < weak.length; i++) {
+    const rec = weak[i];
+    const extra = [];
+    const here = Number.isFinite(rec.lat) ? { lat: rec.lat, lng: rec.lng } : null;
+
+    /*
+     * --- a. the POIs we already hold, pooled across every neighborhood ---
+     *
+     * The first pass matches a record only against the POIs of the neighborhood
+     * the source filed it under. That misses two ordinary cases for free: a
+     * venue sitting near a boundary, whose OSM node was returned by the
+     * neighbouring bbox, and a venue the source filed under the wrong
+     * neighborhood entirely. Both are already on disk — nothing needs fetching,
+     * only a wider net and a distance guard so "Novecento" in Brickell cannot
+     * match "Novecento" in Aventura.
+     */
+    if (here) {
+      const nearby = allPois.filter(
+        (p) => (haversineMeters(here, { lat: p.lat, lng: p.lng }) ?? Infinity) <= POOLED_POI_RADIUS_M,
+      );
+      const match = matchOverpassPoi(rec, nearby);
+      if (match) {
+        const v = validateRawCoordinate({ lat: match.lat, lng: match.lng }, 'overpass_poi');
+        if (v.ok) {
+          extra.push({ ...v.candidate, ...match });
+          pooledHits++;
+        }
+      }
+    }
+
+    /*
+     * --- b. a fresh look at what is named anything, right here ---
+     *
+     * Off by default. Overpass answers these with 429/504 far more often than it
+     * answers them with data, and each attempt costs 24 s of backoff for a hit
+     * rate around one in thirty. Pounding a free shared service at that ratio is
+     * not a reasonable thing to do; enable with --network when its load allows.
+     */
+    if (network && here && !extra.length) {
+      const pois = await overpassAround(rec.lat, rec.lng, TARGETED_RADIUS_M, {
+        refresh,
+        onRetry: (msg) => console.log(`      ${msg}`),
+      });
+      const match = matchOverpassPoi(rec, pois);
+      if (match) {
+        const v = validateRawCoordinate({ lat: match.lat, lng: match.lng }, 'overpass_poi');
+        if (v.ok) {
+          extra.push({ ...v.candidate, ...match });
+          overpassHits++;
+        }
+      }
+    }
+
+    // --- c. the address again, without the suite number ---
+    const parts = rec.detail?.address_parts;
+    const cleanStreet = streetWithoutUnit(parts?.street);
+    if (cleanStreet) {
+      try {
+        const results = await nominatimStructured({ ...parts, street: cleanStreet }, { refresh });
+        for (const result of results) {
+          const v = validateNominatimResult(result, 'nominatim_structured');
+          if (v.ok) {
+            extra.push(v.candidate);
+            nominatimHits++;
+            break;
+          }
+        }
+      } catch {
+        /* Bonus pass: a failure here leaves the record with what it already had. */
+      }
+    }
+
+    if (extra.length) {
+      const merged = [...(candidatesById.get(rec.id) ?? []), ...extra];
+      const before = rec.geo_confidence;
+      const next = resolveCoordinate({ ...rec, address: rec.address }, merged);
+
+      /*
+       * The resolver's verdict is taken whichever way it points. New evidence
+       * that CONTRADICTS the old pin is exactly as informative as evidence that
+       * confirms it — quietly keeping the better-looking tier would be picking
+       * the answer we liked rather than the one the data supports.
+       */
+      const moved =
+        Number.isFinite(rec.lat) && Number.isFinite(next.lat)
+          ? Math.round(haversineMeters({ lat: rec.lat, lng: rec.lng }, { lat: next.lat, lng: next.lng }))
+          : null;
+
+      Object.assign(rec, next, {
+        geo_notes: [
+          ...next.geo_notes,
+          `targeted second look added ${extra.length} candidate(s)`,
+        ],
+      });
+      candidatesById.set(rec.id, merged);
+
+      if (before !== next.geo_confidence || (moved ?? 0) > 25) {
+        movements.push({
+          id: rec.id,
+          name: rec.name,
+          from: before,
+          to: next.geo_confidence,
+          moved_m: moved,
+          direction:
+            tierRank(next.geo_confidence) > tierRank(before)
+              ? 'promoted'
+              : tierRank(next.geo_confidence) < tierRank(before)
+                ? 'demoted'
+                : 'moved',
+        });
+      }
+    }
+
+    if ((i + 1) % 10 === 0 || i === weak.length - 1) {
+      console.log(
+        `  [${String(i + 1).padStart(3)}/${weak.length}] pooled ${pooledHits}, network ${overpassHits}, addresses ${nominatimHits}`,
+      );
+    }
+  }
+
+  const promoted = movements.filter((m) => m.direction === 'promoted');
+  const demoted = movements.filter((m) => m.direction === 'demoted');
+  console.log(`  pooled-POI hits ${pooledHits}, network hits ${overpassHits}, address retries ${nominatimHits}`);
+  console.log(`  promoted: ${promoted.length}  demoted: ${demoted.length}  moved only: ${movements.length - promoted.length - demoted.length}`);
+  for (const m of movements.slice(0, 40)) {
+    console.log(`    ${m.direction.padEnd(9)} ${m.name.slice(0, 42).padEnd(42)} ${m.from} -> ${m.to}${m.moved_m != null ? ` (${m.moved_m} m)` : ''}`);
+  }
+
+  return movements;
+}
+
+export async function run({ refresh = false, limit = null, network = false } = {}) {
   console.log('\n=== PHASE 4: geocoding cascade ===');
 
   const prev = JSON.parse(fs.readFileSync(path.join(DATA_DIR, '03-guides.json'), 'utf8'));
@@ -89,6 +274,7 @@ export async function run({ refresh = false, limit = null } = {}) {
   const rejections = [];
   const resolved = [];
   const methodCounts = {};
+  const candidatesById = new Map();
   let freeTextCalls = 0;
 
   for (let i = 0; i < records.length; i++) {
@@ -189,11 +375,24 @@ export async function run({ refresh = false, limit = null } = {}) {
       });
     }
 
+    candidatesById.set(r.id, candidates);
     resolved.push({ ...r, address, ...resolution, geo_rejections: rejectedFor.length ? rejectedFor : undefined });
 
     if ((i + 1) % 25 === 0 || i === records.length - 1) {
       console.log(`  [${String(i + 1).padStart(3)}/${records.length}] freetext calls: ${freeTextCalls}`);
     }
+  }
+
+  // ---------- Targeted second look at whatever came out weak ----------
+  const allPois = [...poisByNeighborhood.values()].filter(Boolean).flat();
+  const promotions = await targetedPass(resolved, candidatesById, allPois, { refresh, network });
+
+  // The targeted pass can change which method wins, so the tally is taken after
+  // it rather than accumulated during the first pass.
+  for (const k of Object.keys(methodCounts)) delete methodCounts[k];
+  for (const r of resolved) {
+    const m = r.geo_method ?? 'none';
+    methodCounts[m] = (methodCounts[m] ?? 0) + 1;
   }
 
   // ---------- Cross-record: coordinate collapse ----------
@@ -245,6 +444,7 @@ export async function run({ refresh = false, limit = null } = {}) {
         tier_counts: tierCounts,
         method_counts: methodCounts,
         flag_counts: flagCounts,
+        targeted_movements: promotions,
         corroborated,
         clusters,
         rejections,

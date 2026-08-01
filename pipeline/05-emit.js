@@ -348,7 +348,15 @@ export function buildReview(records, meta) {
 export async function run() {
   console.log('\n=== PHASE 5: emit dataset + review report ===');
 
-  const geo = JSON.parse(fs.readFileSync(path.join(DATA_DIR, '04-geocode.json'), 'utf8'));
+  /*
+   * Phase 4b's output supersedes phase 4's when it exists: it is the same
+   * records with the venue-page second opinion folded in. Falling back keeps the
+   * pipeline runnable without it, so a venue-site outage never blocks a release.
+   */
+  const corroborated = path.join(DATA_DIR, '04b-corroborate.json');
+  const geoFile = fs.existsSync(corroborated) ? corroborated : path.join(DATA_DIR, '04-geocode.json');
+  console.log(`  geo source: ${path.basename(geoFile)}`);
+  const geo = JSON.parse(fs.readFileSync(geoFile, 'utf8'));
   const directory = JSON.parse(fs.readFileSync(path.join(DATA_DIR, '01-directory.json'), 'utf8'));
 
   const publicRecords = geo.records

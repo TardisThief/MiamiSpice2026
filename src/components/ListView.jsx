@@ -26,9 +26,9 @@ import {
 import { RestaurantRow } from './RestaurantRow.jsx';
 import { Chip, EmptyState, Segmented, SkeletonList } from './primitives.jsx';
 import { FilterSheet } from './FilterSheet.jsx';
+import { MultiSelect } from './MultiSelect.jsx';
 import {
   IconCalendar,
-  IconChevronDown,
   IconClose,
   IconSearch,
   IconSliders,
@@ -85,10 +85,21 @@ export function ListView() {
   const cuisines = useMemo(() => cuisineOptions(restaurants), [restaurants]);
   const activeCount = countActiveFilters(filters);
   const today = todayCode();
-  // A single selected value drives the dropdown; the filter sheet can still select
-  // several, in which case the dropdown reports that rather than lying.
-  const dayValue = filters.days.length === 1 ? filters.days[0] : '';
-  const cuisineValue = filters.cuisines.length === 1 ? filters.cuisines[0] : '';
+
+  // Today leads the day list — it's the one people reach for most — and is
+  // labelled as such so it isn't mistaken for a duplicate of the weekday below.
+  const dayOptions = useMemo(
+    () => [
+      { value: today, label: `Today · ${DAY_NAMES[today]}` },
+      ...DAYS.filter((d) => d !== today).map((d) => ({ value: d, label: DAY_NAMES[d] })),
+    ],
+    [today],
+  );
+
+  const cuisineChoices = useMemo(
+    () => cuisines.map((c) => ({ value: c.name, label: c.name, count: c.count })),
+    [cuisines],
+  );
 
   // Reset scroll when the result set changes, so a new filter starts at the top.
   const resultKey = `${deferredFilters.query}|${activeCount}|${sort}`;
@@ -152,61 +163,30 @@ export function ListView() {
           the platform picker is good at, it opens as a proper wheel on a phone,
           and it's keyboard- and screen-reader-correct for free.
         */}
-        <label className={`selfilter ${dayValue ? 'is-active' : ''}`}>
-          <IconCalendar className="selfilter__icon" width={15} height={15} />
-          <select
-            className="selfilter__control"
-            aria-label="Filter by day of the week"
-            value={dayValue}
-            onChange={(e) => {
-              const v = e.target.value;
-              setFilters((f) => ({ ...f, days: v ? [v] : [] }));
-            }}
-          >
-            <option value="">Any day</option>
-            <option value={today}>Today · {today}</option>
-            {DAYS.map((d) => (
-              <option key={d} value={d}>
-                {DAY_NAMES[d]}
-              </option>
-            ))}
-            {filters.days.length > 1 && (
-              <option value="" disabled>
-                {filters.days.length} days selected
-              </option>
-            )}
-          </select>
-          <IconChevronDown className="selfilter__chev" width={14} height={14} />
-        </label>
+        {/*
+          Both of these are multi-select: "Thursday or Friday" and "Italian or
+          Spanish" are ordinary things to want, and the sheet already allowed
+          them — the chip row just couldn't express it.
+        */}
+        <MultiSelect
+          icon={<IconCalendar width={15} height={15} className="selfilter__icon" />}
+          noun="day"
+          plural="days"
+          emptyLabel="Any day"
+          options={dayOptions}
+          selected={filters.days}
+          onChange={(days) => setFilters((f) => ({ ...f, days }))}
+        />
 
-        {/* Same treatment as days: 24 cuisines is exactly what a platform picker
-            handles well, and it costs one control's worth of chip row instead of
-            twenty-four. The sheet still offers multi-select. */}
-        <label className={`selfilter ${cuisineValue ? 'is-active' : ''}`}>
-          <IconUtensils className="selfilter__icon" width={15} height={15} />
-          <select
-            className="selfilter__control"
-            aria-label="Filter by cuisine"
-            value={cuisineValue}
-            onChange={(e) => {
-              const v = e.target.value;
-              setFilters((f) => ({ ...f, cuisines: v ? [v] : [] }));
-            }}
-          >
-            <option value="">Any cuisine</option>
-            {cuisines.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name} ({c.count})
-              </option>
-            ))}
-            {filters.cuisines.length > 1 && (
-              <option value="" disabled>
-                {filters.cuisines.length} cuisines selected
-              </option>
-            )}
-          </select>
-          <IconChevronDown className="selfilter__chev" width={14} height={14} />
-        </label>
+        <MultiSelect
+          icon={<IconUtensils width={15} height={15} className="selfilter__icon" />}
+          noun="cuisine"
+          plural="cuisines"
+          emptyLabel="Any cuisine"
+          options={cuisineChoices}
+          selected={filters.cuisines}
+          onChange={(cuisines) => setFilters((f) => ({ ...f, cuisines }))}
+        />
 
         {MEAL_OPTIONS.map((m) => (
           <Chip key={m.id} active={filters.meals.includes(m.id)} onClick={() => toggle('meals', m.id)}>

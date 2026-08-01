@@ -786,3 +786,125 @@ test('cuisine counts toward the active-filter badge', async () => {
   assert.equal(countActiveFilters(EMPTY_FILTERS), 0);
   assert.equal(countActiveFilters({ ...EMPTY_FILTERS, cuisines: ['Thai', 'Greek'] }), 2);
 });
+
+/* ------------------------------------------------------- targeted geocoding */
+
+test('a suite number is stripped from a street, an address is not', async () => {
+  const { streetWithoutUnit } = await import('../pipeline/lib/geo-providers.js');
+
+  // Nominatim resolves the street but not the interior of the building.
+  assert.equal(streetWithoutUnit('5335 NW 87th Ave., Suite C102'), '5335 NW 87th Ave.');
+  assert.equal(streetWithoutUnit('3060 SW 37th Ave. Suite 104'), '3060 SW 37th Ave.');
+  assert.equal(streetWithoutUnit('3444 Main Highway Suite #16'), '3444 Main Highway');
+  assert.equal(streetWithoutUnit('19565 Biscayne Blvd #1178'), '19565 Biscayne Blvd');
+  assert.equal(streetWithoutUnit('2000 Ponce De Leon Blvd, Floor 2'), '2000 Ponce De Leon Blvd');
+
+  // null means "nothing to strip", so the caller skips a duplicate request.
+  assert.equal(streetWithoutUnit('801 Brickell Ave'), null);
+  assert.equal(streetWithoutUnit('150 NE 8th Street'), null);
+  assert.equal(streetWithoutUnit(''), null);
+  assert.equal(streetWithoutUnit(null), null);
+
+  // Never hand back something that has stopped being an address.
+  assert.equal(streetWithoutUnit('Suite 12'), null);
+});
+
+/* ------------------------------------------- venue-page geo extraction (4b) */
+
+test('schema.org geo and address are lifted verbatim', async () => {
+  const { extractGeo } = await import('../pipeline/lib/extract-geo.js');
+
+  const html = `<html><head><script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Restaurant',
+    name: 'Test Kitchen',
+    geo: { '@type': 'GeoCoordinates', latitude: 25.7657, longitude: -80.1899 },
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '801 Brickell Ave',
+      addressLocality: 'Miami',
+      addressRegion: 'FL',
+      postalCode: '33131',
+    },
+  })}</script></head><body></body></html>`;
+
+  const { coords, addresses } = extractGeo(html);
+  assert.equal(coords.length, 1);
+  assert.deepEqual(
+    { lat: coords[0].lat, lng: coords[0].lng, source: coords[0].source },
+    { lat: 25.7657, lng: -80.1899, source: 'jsonld_geo' },
+  );
+  assert.equal(addresses[0].street, '801 Brickell Ave');
+  assert.equal(addresses[0].postalcode, '33131');
+});
+
+test('a Google Maps embed is read with lat and lng the right way round', async () => {
+  const { extractGeo } = await import('../pipeline/lib/extract-geo.js');
+  // In !2d…!3d…, 2d is LONGITUDE and 3d is LATITUDE. Reversing them puts every
+  // Miami restaurant in the Indian Ocean, so it is worth pinning down.
+  const html = `<iframe src="https://www.google.com/maps/embed?pb=!1m18!2d-80.1899!3d25.7657!5e0"></iframe>`;
+  const { coords } = extractGeo(html);
+  assert.equal(coords.length, 1);
+  assert.ok(Math.abs(coords[0].lat - 25.7657) < 1e-6, `lat was ${coords[0].lat}`);
+  assert.ok(Math.abs(coords[0].lng - -80.1899) < 1e-6, `lng was ${coords[0].lng}`);
+});
+
+test('coordinates outside Greater Miami are refused, whatever the page says', async () => {
+  const { extractGeo } = await import('../pipeline/lib/extract-geo.js');
+  const html = `<html><head><script type="application/ld+json">${JSON.stringify({
+    '@type': 'Restaurant',
+    geo: { latitude: 40.7128, longitude: -74.006 }, // the New York flagship
+  })}</script></head></html>`;
+  assert.equal(extractGeo(html).coords.length, 0);
+});
+
+test('malformed JSON-LD is skipped, not repaired', async () => {
+  const { extractGeo } = await import('../pipeline/lib/extract-geo.js');
+  const html = `<script type="application/ld+json">{ "@type": "Restaurant", geo: broken</script>`;
+  assert.deepEqual(extractGeo(html), { coords: [], addresses: [] });
+});
+
+test("a chain's page listing several branches is discarded, not guessed at", async () => {
+  const { consolidateCoords } = await import('../pipeline/04b-corroborate.js');
+
+  // Two tags describing one venue: agreement, so the page is usable.
+  const agreeing = consolidateCoords([
+    { lat: 25.7657, lng: -80.1899, source: 'jsonld_geo' },
+    { lat: 25.7658, lng: -80.19, source: 'opengraph_place' },
+  ]);
+  assert.equal(agreeing.reason, 'agreed');
+  assert.equal(agreeing.coord.lat, 25.7657);
+
+  // Five branches across the county: nothing on the page says which is ours.
+  const chain = consolidateCoords([
+    { lat: 25.7026, lng: -80.2933, source: 'gmaps_at' },
+    { lat: 25.9133, lng: -80.3096, source: 'gmaps_at' },
+    { lat: 25.7528, lng: -80.2619, source: 'gmaps_at' },
+  ]);
+  assert.equal(chain.coord, null);
+  assert.equal(chain.reason, 'ambiguous_page');
+
+  assert.equal(consolidateCoords([]).coord, null);
+});
+
+test('a building name is turned into a geocodable place query', async () => {
+  const { hostPropertyQuery } = await import('../pipeline/04b-corroborate.js');
+
+  assert.equal(
+    hostPropertyQuery('The Ritz-Carlton, Key Biscayne, Key Biscayne, FL, 33149'),
+    'The Ritz-Carlton, Key Biscayne, FL, 33149',
+  );
+  assert.equal(hostPropertyQuery('Dadeland Mall, Miami, FL, 33156'), 'Dadeland Mall, Miami, FL, 33156');
+  // Trailing prose is dropped along with the full stop.
+  assert.equal(
+    hostPropertyQuery('The Abbey at Aventura, adjacent to the Aventura Mall., Miami, FL, 33180'),
+    'The Abbey at Aventura, Miami, FL, 33180',
+  );
+
+  // A real street address belongs to the street path, not this one.
+  assert.equal(hostPropertyQuery('801 Brickell Ave, Miami, FL, 33131'), null);
+  assert.equal(hostPropertyQuery(''), null);
+  assert.equal(hostPropertyQuery(null), null);
+  // A lone city name is not a building.
+  assert.equal(hostPropertyQuery('Miami, FL, 33131'), null);
+});

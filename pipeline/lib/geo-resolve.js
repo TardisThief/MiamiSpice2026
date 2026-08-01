@@ -41,13 +41,22 @@ export const MAX_RESULT_BBOX_KM = 1.0;
 /** Distance from the declared neighborhood centroid that triggers a soft flag. */
 export const NEIGHBORHOOD_DISAGREE_M = 4000;
 
-/** Method priority: lower wins ties for which coordinate to use. */
+/**
+ * Method priority: lower wins ties for which coordinate to use.
+ *
+ * `venue_site` sits just below a matched OSM POI and above the Miami Spice
+ * listing's own coordinate. It is a geo block the restaurant (or its booking
+ * platform) published about itself on its own page — a first-party statement
+ * about its own location, which is stronger evidence than a directory entry,
+ * but weaker than an independently surveyed OSM node.
+ */
 const METHOD_PRIORITY = {
   manual: 0,
   overpass_poi: 1,
-  listing_jsonld: 2,
-  nominatim_structured: 3,
-  nominatim_freetext: 4,
+  venue_site: 2,
+  listing_jsonld: 3,
+  nominatim_structured: 4,
+  nominatim_freetext: 5,
   neighborhood_centroid: 9,
 };
 
@@ -424,11 +433,23 @@ export function resolveCoordinate(record, candidates) {
     geo_notes: notes,
     geo_corroboration: distances,
     geo_neighborhood_distance_m: neighborhoodDistanceM,
+    /*
+     * Carries the qualifiers, not just the coordinates. Phase 4b re-resolves
+     * from this list with fresh evidence added, and a candidate that arrived
+     * back without `container_only` or `ambiguous` would be treated as a clean
+     * POI match — silently promoting the very thing those flags exist to hold
+     * back.
+     */
     geo_candidates: usable.map((c) => ({
       method: c.method,
       lat: c.lat,
       lng: c.lng,
       label: c.label ?? null,
+      precise: c.precise ?? false,
+      ...(c.container_only != null ? { container_only: c.container_only } : {}),
+      ...(c.ambiguous != null ? { ambiguous: c.ambiguous } : {}),
+      ...(c.score != null ? { score: c.score } : {}),
+      ...(c.osm ? { osm: c.osm } : {}),
     })),
   };
 }
