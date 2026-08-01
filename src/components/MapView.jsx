@@ -241,20 +241,31 @@ export function MapView() {
    * and cost a visible stutter, so the previously selected marker is reverted and
    * the new one promoted in place.
    */
+  /*
+   * What counts as "selected" for the purpose of highlighting.
+   *
+   * On a phone, tapping a pin raises the peek card and deliberately does NOT set
+   * selectedId — that opens the full detail sheet, which would bury the map. But
+   * the highlight was keyed off selectedId alone, so tapping a pin on a phone
+   * highlighted nothing at all: the one gesture most likely to need the feedback
+   * was the one gesture that never got it.
+   */
+  const highlightId = peek ? String(peek.id) : selectedId;
+
   const prevSelectedRef = useRef(null);
   useEffect(() => {
     const markers = markersRef.current;
     if (!markers) return;
 
     const prev = prevSelectedRef.current;
-    if (prev && prev !== selectedId) {
+    if (prev && prev !== highlightId) {
       const entry = markers.get(String(prev));
       entry?.marker.setIcon(markerIcon(entry.record, false));
       entry?.marker.setZIndexOffset(entry.record.geo_confidence === 'neighborhood_only' ? -500 : 0);
     }
 
-    if (selectedId) {
-      const entry = markers.get(String(selectedId));
+    if (highlightId) {
+      const entry = markers.get(String(highlightId));
       if (entry) {
         entry.marker.setIcon(markerIcon(entry.record, true));
         // Lift it clear of neighbours so the ring isn't half-hidden.
@@ -262,8 +273,8 @@ export function MapView() {
       }
     }
 
-    prevSelectedRef.current = selectedId;
-  }, [selectedId, results]);
+    prevSelectedRef.current = highlightId;
+  }, [highlightId, results]);
 
   /*
    * Bring the map to the selected restaurant.

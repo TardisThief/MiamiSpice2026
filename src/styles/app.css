@@ -1776,28 +1776,39 @@
  * the accent hue is otherwise reserved for "approximate", so selection uses a
  * heavy ring plus the size bump set in markerIcon rather than a third colour.
  */
+/*
+ * The selected pin.
+ *
+ * Its own hue, not --primary: most pins on this map ARE --primary, so the old
+ * treatment made the selection a slightly larger teal dot among 350 teal dots
+ * and you had to hunt for it. --select is used for nothing else.
+ *
+ * `border-style` is deliberately left alone. An approximate pin is dashed to
+ * carry its caveat in the shape as well as the colour, and selecting it must not
+ * quietly upgrade how certain it looks.
+ */
 .mk--selected {
-  background: var(--primary) !important;
-  border: 3px solid var(--bg) !important;
+  background: var(--select) !important;
+  border-width: 3px !important;
+  border-color: var(--bg) !important;
   box-shadow:
-    0 0 0 4px var(--primary),
-    0 4px 12px oklch(0 0 0 / 0.35) !important;
+    0 0 0 4px var(--select),
+    0 4px 14px oklch(0 0 0 / 0.4) !important;
   z-index: 1;
 }
 
 .mk--selected::before {
   content: "";
   position: absolute;
-  inset: -10px;
+  inset: -12px;
   border-radius: 50%;
-  border: 2px solid var(--primary);
-  opacity: 0.45;
+  border: 3px solid var(--select-ring);
   animation: mk-pulse 2s var(--ease) infinite;
 }
 
 @keyframes mk-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.45; }
-  50% { transform: scale(1.18); opacity: 0.12; }
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.22); opacity: 0.15; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -817,6 +817,57 @@ console.log('\nshortcuts');
   await sp.waitForTimeout(400);
   check('clearing the cuisine restores the list', (await countNow()) === total);
 
+  /*
+   * Tapping a pin on a phone must highlight it. This was broken in a way the
+   * desktop checks could not see: on a phone a pin tap raises the peek card
+   * without setting selectedId, and the highlight was keyed off selectedId, so
+   * the pin never changed at all.
+   */
+  await sp.locator('.tab', { has: sp.locator('.tab__label', { hasText: /^Map$/ }) }).click();
+  await sp.waitForTimeout(3000);
+
+  // Drill into clusters until individual pins are on screen.
+  for (let i = 0; i < 6; i++) {
+    const pins = await sp.locator('.leaflet-marker-icon .mk').count();
+    if (pins >= 2) break;
+    const clusters = sp.locator('.cluster');
+    if (!(await clusters.count())) break;
+    await clusters.first().click({ force: true });
+    await sp.waitForTimeout(1400);
+  }
+
+  const pinCount = await sp.locator('.leaflet-marker-icon .mk').count();
+  await sp.locator('.leaflet-marker-icon .mk').first().click({ force: true });
+  await sp.waitForTimeout(1200);
+
+  check('tapping a pin highlights it', (await sp.locator('.mk--selected').count()) === 1, `${pinCount} pins on screen`);
+  check('and raises the peek card for it', (await sp.locator('.peek').count()) === 1);
+
+  // The highlight has to be a different colour from the ordinary pins, not just
+  // a larger version of the same one — that was the original complaint.
+  const hues = await sp.evaluate(() => {
+    const read = (el) => getComputedStyle(el).backgroundColor;
+    const sel = document.querySelector('.mk--selected');
+    return {
+      selected: sel ? read(sel) : null,
+      others: [
+        ...new Set(
+          [...document.querySelectorAll('.leaflet-marker-icon .mk:not(.mk--selected)')].map(read),
+        ),
+      ],
+    };
+  });
+  check(
+    'the highlight colour is used by no other pin',
+    !!hues.selected && !hues.others.includes(hues.selected),
+    `${hues.selected} vs ${hues.others.join(', ') || 'none'}`,
+  );
+
+  // Dismissing the peek clears the highlight, so nothing is left looking chosen.
+  await sp.locator('.peek button[aria-label="Dismiss"]').click();
+  await sp.waitForTimeout(900);
+  check('closing the peek clears the highlight', (await sp.locator('.mk--selected').count()) === 0);
+
   check('no page errors', errs.length === 0, errs[0] ?? '');
   await ctx2.close();
 }

@@ -47,6 +47,15 @@
   --danger: oklch(0.52 0.16 25);
   --muted-mark: oklch(0.68 0.006 var(--hue));
 
+  /*
+   * Map selection. A hue nothing else in the palette uses — primary sits at 212,
+   * positive at 155, accent at 66, danger at 25 — because the selected pin has
+   * to be findable among 350 others at a glance. It previously reused --primary,
+   * which is the colour most pins already are.
+   */
+  --select: oklch(0.55 0.21 328);
+  --select-ring: oklch(0.55 0.21 328 / 0.35);
+
   /* ---- Type ---- */
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
@@ -148,6 +157,8 @@
     --rose-soft: oklch(0.3 0.045 14);
     --danger: oklch(0.7 0.15 25);
     --muted-mark: oklch(0.52 0.006 var(--hue));
+    --select: oklch(0.76 0.19 328);
+    --select-ring: oklch(0.76 0.19 328 / 0.4);
 
     --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
     --shadow-md: 0 2px 8px oklch(0 0 0 / 0.45);
@@ -186,6 +197,8 @@
   --rose-soft: oklch(0.3 0.045 14);
   --danger: oklch(0.7 0.15 25);
   --muted-mark: oklch(0.52 0.006 var(--hue));
+  --select: oklch(0.76 0.19 328);
+  --select-ring: oklch(0.76 0.19 328 / 0.4);
 
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
   --shadow-md: 0 2px 8px oklch(0 0 0 / 0.45);
