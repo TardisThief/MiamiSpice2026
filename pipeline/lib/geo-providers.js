@@ -38,6 +38,61 @@ const OVERPASS_THROTTLE_MS = 8000;
 /** Bias/limit results to Greater Miami. */
 const VIEWBOX = '-80.87,25.98,-80.10,25.13'; // west,north,east,south
 
+const CENSUS = 'https://geocoding.geo.census.gov/geocoder/locations/address';
+
+/**
+ * The US Census Bureau's address geocoder.
+ *
+ * Added because the records that stay `approximate` are mostly stuck for one
+ * reason: the Miami Spice listing's coordinate and Nominatim's geocode of the
+ * same address disagree, and with one source each there is nothing to break the
+ * tie. Asking Nominatim a second way does not help — it is the same database.
+ *
+ * This is a genuinely different one. TIGER/Line is the Census Bureau's own
+ * national address and street file, maintained by a federal agency and not
+ * derived from OpenStreetMap, so when it agrees with one of the two it is real
+ * corroboration rather than an echo. Free, no key, and public.
+ *
+ * Its results are street-segment interpolations rather than surveyed rooftops,
+ * which is address-level accuracy and no better — good enough to confirm a
+ * street address, never good enough to claim a POI match.
+ */
+export async function censusGeocode(parts, { refresh = false } = {}) {
+  if (!parts?.street) return [];
+
+  const qs = new URLSearchParams({
+    street: parts.street,
+    city: parts.city ?? 'Miami',
+    state: parts.state ?? 'FL',
+    benchmark: 'Public_AR_Current',
+    format: 'json',
+  });
+  if (parts.postalcode) qs.set('zip', parts.postalcode);
+
+  const url = `${CENSUS}?${qs}`;
+  const { json } = await fetchCachedJson(url, {
+    cacheFile: `geocache/census/${hashKey(url)}.json`,
+    refresh,
+    throttleMs: 700,
+    hostKey: 'census',
+    retries: 2,
+    backoffMs: 3000,
+    timeoutMs: 30000,
+  });
+
+  const matches = json?.result?.addressMatches ?? [];
+  return matches
+    .map((m) => ({
+      lat: Number(m.coordinates?.y),
+      lng: Number(m.coordinates?.x),
+      label: m.matchedAddress ?? null,
+      // TIGER tells us which side of which street segment; that is an address,
+      // not a building, so it can corroborate but never upgrade to a POI match.
+      precise: true,
+    }))
+    .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng));
+}
+
 /**
  * Drop the unit designator from a street line.
  *

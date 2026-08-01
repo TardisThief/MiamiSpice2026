@@ -965,3 +965,32 @@ test('genuine cross-provider agreement outranks a same-provider pair', () => {
   assert.ok(Math.abs(res.lat - 25.7657) < 1e-3, `picked ${res.lat}, wanted the corroborated pair`);
   assert.ok(res.geo_notes.some((n) => n.startsWith('corroborated')));
 });
+
+test('a source that argues with itself cannot veto a consensus', () => {
+  /*
+   * Belly Fish's real shape: Nominatim returns one result on the pin and another
+   * 29.5 km away. The far one used to cap the record at approximate, outvoting
+   * two independent providers that agreed with each other.
+   */
+  const res = resolveCoordinate(brickell, [
+    { method: 'listing_jsonld', lat: 25.7657, lng: -80.1899, precise: true },
+    { method: 'nominatim_structured', lat: 25.7658, lng: -80.19, precise: true },
+    { method: 'census_geocoder', lat: 25.7656, lng: -80.1898, precise: true },
+    // Same provider as the agreeing structured result, wildly off.
+    { method: 'nominatim_freetext', lat: 25.98, lng: -80.42, precise: true },
+  ]);
+  assert.ok(!res.geo_flags.includes('source_disagreement'), res.geo_flags.join(','));
+  assert.equal(res.geo_confidence, 'address_exact');
+});
+
+test('a dissent from an otherwise-silent provider still counts', () => {
+  // Only Nominatim agrees; the listing dissents and has said nothing else. That
+  // is a genuine two-way disagreement and must still cap the record.
+  const res = resolveCoordinate(brickell, [
+    { method: 'nominatim_structured', lat: 25.7658, lng: -80.19, precise: true },
+    { method: 'census_geocoder', lat: 25.7656, lng: -80.1898, precise: true },
+    { method: 'listing_jsonld', lat: 25.79, lng: -80.22, precise: true },
+  ]);
+  assert.ok(res.geo_flags.includes('source_disagreement'));
+  assert.equal(res.geo_confidence, 'approximate');
+});

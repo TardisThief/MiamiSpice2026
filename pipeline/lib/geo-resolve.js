@@ -48,6 +48,7 @@ const PROVIDER_OF = {
   overpass_poi: 'osm_overpass',
   nominatim_structured: 'nominatim',
   nominatim_freetext: 'nominatim',
+  census_geocoder: 'us_census',
   venue_site: 'venue_own_page',
   manual: 'human',
   neighborhood_centroid: 'derived',
@@ -82,7 +83,8 @@ const METHOD_PRIORITY = {
   venue_site: 2,
   listing_jsonld: 3,
   nominatim_structured: 4,
-  nominatim_freetext: 5,
+  census_geocoder: 5,
+  nominatim_freetext: 6,
   neighborhood_centroid: 9,
 };
 
@@ -423,7 +425,20 @@ export function resolveCoordinate(record, candidates) {
    * cries wolf is worse than none — the eye learns to skip it. It is still recorded
    * as a distinct flag so the record stays auditable in the review report.
    */
-  const trustedConflicts = conflicting.filter((c) => !c.unreliable);
+  /*
+   * A source that both agrees and disagrees with us is arguing with itself, and
+   * its dissent carries no weight against a consensus it partly supports.
+   *
+   * This is common and not subtle. A geocoder asked for one address can return
+   * several results; Belly Fish gets one from Nominatim that lands on the pin and
+   * another 29.5 km away, Serafina one on the pin and another 20 km away. Letting
+   * the second veto the first would mean a single bad row in a multi-result
+   * response permanently caps a record that three independent providers agree on.
+   */
+  const agreeingProviders = new Set(agreeing.map((a) => providerOf(a.method)));
+  const selfContradicting = (c) => agreeingProviders.has(providerOf(c.method));
+
+  const trustedConflicts = conflicting.filter((c) => !c.unreliable && !selfContradicting(c));
   const unreliableConflicts = conflicting.filter((c) => c.unreliable);
   const conflictUndermines = trustedConflicts.length > 0 || (conflicting.length > 0 && !agreeing.length);
 

@@ -34,7 +34,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fetchCached, ROOT } from './lib/http.js';
 import { extractGeo } from './lib/extract-geo.js';
-import { nominatimFreeText, nominatimStructured } from './lib/geo-providers.js';
+import {
+  censusGeocode,
+  nominatimFreeText,
+  nominatimStructured,
+  streetWithoutUnit,
+} from './lib/geo-providers.js';
 import {
   CORROBORATION_M,
   resolveCoordinate,
@@ -139,11 +144,49 @@ async function getPage(url, label, { refresh }) {
   }
 }
 
+/**
+ * Extra pages to consult, keyed by record id.
+ *
+ * The automatic sources — the venue's own site, its booking profile, OSM, two
+ * geocoders — leave a handful of records with nothing to go on, usually because
+ * the restaurant's site is a single JavaScript splash page that states nothing
+ * about where it is. For those, a URL found by searching is added here by hand.
+ *
+ * What is added is only ever a URL. The coordinate still has to come out of that
+ * page's own markup, through the same extractor and the same validators as every
+ * other source. Nothing is transcribed from a search result, because a coordinate
+ * I typed in myself would be indistinguishable from one I had invented.
+ */
+function loadSeeds() {
+  const file = path.join(DATA_DIR, 'venue-seeds.json');
+  if (!fs.existsSync(file)) return {};
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    // { "<id>": { why: "...", urls: [...] } } or { "<id>": [...] }.
+    // Underscore keys are commentary, not records — without this the `_readme`
+    // prose would be read as a list of URLs and dutifully fetched.
+    return Object.fromEntries(
+      Object.entries(raw)
+        .filter(([id]) => !id.startsWith('_'))
+        .map(([id, v]) => [
+          id,
+          (Array.isArray(v) ? v : (v?.urls ?? [])).filter((u) => /^https?:\/\//.test(u)),
+        ]),
+    );
+  } catch (e) {
+    console.warn(`  !! venue-seeds.json could not be read (${e.message}) — continuing without it`);
+    return {};
+  }
+}
+
 export async function run({ refresh = false, limit = null, all = false } = {}) {
   console.log('\n=== PHASE 4b: second opinion from venue pages ===');
 
   const prev = JSON.parse(fs.readFileSync(path.join(DATA_DIR, '04-geocode.json'), 'utf8'));
   const records = prev.records;
+  const seeds = loadSeeds();
+  const seedCount = Object.values(seeds).reduce((n, a) => n + a.length, 0);
+  if (seedCount) console.log(`  ${seedCount} hand-found page(s) seeded for ${Object.keys(seeds).length} record(s)`);
 
   // Only the records phase 4 could not place well. Everything else already has
   // independent corroboration and does not need a third-party page fetched.
@@ -162,6 +205,8 @@ export async function run({ refresh = false, limit = null, all = false } = {}) {
     address_geocoded: 0,
     host_property_tried: 0,
     host_property_found: 0,
+    census_tried: 0,
+    census_found: 0,
     promoted: 0,
     demoted: 0,
     moved: 0,
@@ -181,6 +226,8 @@ export async function run({ refresh = false, limit = null, all = false } = {}) {
         BOOKABLE_PROFILE.test(rec.detail?.reservation_url ?? '') ? rec.detail.reservation_url : null,
         `${slug}-booking`,
       ],
+      // Pages found by hand for records the automatic sources could not place.
+      ...(seeds[slug] ?? []).map((url, n) => [url, `${slug}-seed${n}`]),
     ];
 
     const coords = [];
@@ -232,6 +279,37 @@ export async function run({ refresh = false, limit = null, all = false } = {}) {
         }
       } catch {
         /* leave it; the record keeps what it had */
+      }
+    }
+
+    /*
+     * --- a genuinely independent geocoder ---
+     *
+     * The single most common reason a record is stuck at `approximate` is that
+     * the listing's coordinate and Nominatim's geocode of the same address
+     * disagree, one source each, with nothing to break the tie. TIGER/Line is a
+     * different database maintained by a different organisation, so its answer
+     * is a real third opinion rather than an echo of the second.
+     */
+    const censusParts = rec.detail?.address_parts;
+    if (censusParts?.street) {
+      stats.census_tried++;
+      const streets = [censusParts.street, streetWithoutUnit(censusParts.street)].filter(Boolean);
+      for (const street of streets) {
+        try {
+          const hits = await censusGeocode({ ...censusParts, street }, { refresh });
+          const first = hits[0];
+          if (!first) continue;
+          const v = validateRawCoordinate({ lat: first.lat, lng: first.lng }, 'census_geocoder');
+          if (v.ok) {
+            extra.push({ ...v.candidate, label: first.label });
+            evidence.push(`US Census geocoder matched "${first.label}"`);
+            stats.census_found++;
+            break;
+          }
+        } catch {
+          /* leave it; the record keeps what it had */
+        }
       }
     }
 
@@ -306,6 +384,7 @@ export async function run({ refresh = false, limit = null, all = false } = {}) {
   console.log(`  discarded as ambiguous: ${stats.coord_ambiguous}`);
   console.log(`  address published:      ${stats.address_found} (${stats.address_geocoded} geocoded)`);
   console.log(`  host property geocoded: ${stats.host_property_found} of ${stats.host_property_tried} tried`);
+  console.log(`  US Census matched:      ${stats.census_found} of ${stats.census_tried} tried`);
 
   console.log('\n--- tier movement ---');
   console.log(`  promoted:  ${stats.promoted}`);
