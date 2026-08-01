@@ -4,16 +4,17 @@
  * Ordered by what actually decides the evening:
  *   1. Shared availability. "All three are open Thursday dinner" is the one thing
  *      no other screen can tell you, so it leads.
- *   2. The availability grid it comes from, so the claim is checkable.
- *   3. Price, distance, area — the at-a-glance facts.
+ *   2. When they serve — the day strips that claim is drawn from, so it's checkable.
+ *   3. At a glance — price, distance, area.
  *   4. Menus, scoped to ONE meal. Four restaurants could otherwise mean a dozen
  *      menus on screen, which defeats the purpose.
+ *   5. Quick actions — book, directions, call — last, because they're what you do
+ *      after the comparison rather than part of it.
  *
- * The menu layout adapts because the phone forces it: at 412px, two columns give
- * ~190px each (fine for dish names) but four give ~100px, where names wrap into
- * unreadable ribbons. So two picks get true side-by-side columns, and three or four
- * get a course accordion where every restaurant's appetizers sit together at full
- * width. Both are real comparisons; only the axis changes.
+ * Everything below the headline is one table with restaurants as columns, so a
+ * fact and the action that follows from it sit under the same heading. Each
+ * section collapses on its own: settle the night, fold the day strips away, and
+ * the menus move up the screen.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -28,17 +29,19 @@ import {
   sharedSlots,
 } from '../lib/compare.js';
 import { formatDays, formatDishName, formatPriceRange } from '../lib/dataset.js';
-import { formatDistance, nativeMapsUrl } from '../lib/geo.js';
+import { formatDistance, nativeMapsUrl, reservationTarget } from '../lib/geo.js';
 import { ConfidenceBadge } from './ConfidenceBadge.jsx';
 import { Chip, EmptyState, Sheet } from './primitives.jsx';
 import { FilterSheet } from './FilterSheet.jsx';
 import { useMediaQuery } from '../lib/useMediaQuery.js';
 import {
+  IconCalendar,
   IconChevronDown,
   IconChevronRight,
   IconClose,
   IconCompare,
   IconNavigate,
+  IconPhone,
   IconSpark,
 } from './Icons.jsx';
 
@@ -93,7 +96,7 @@ function SharedHeadline({ records }) {
  * the night, fold "When they serve" away, and the menus move up the screen.
  */
 function CompareTable({ records, origin, onOpen }) {
-  const [open, setOpen] = useState({ serve: true, glance: true, menu: true });
+  const [open, setOpen] = useState({ serve: true, glance: true, menu: true, act: true });
   const toggle = (key) => setOpen((o) => ({ ...o, [key]: !o[key] }));
 
   const meals = useMemo(() => offeredMeals(records), [records]);
@@ -150,11 +153,33 @@ function CompareTable({ records, origin, onOpen }) {
         </>
       ),
     },
+  ].filter((row) => !row.hide);
+
+  /*
+   * The last thing a comparison should do is make you go somewhere else to act
+   * on it. Once you've picked a column, booking, directions and the phone are
+   * right under it — still aligned to the restaurant, so there's no chance of
+   * calling the one you just ruled out.
+   */
+  const actionRows = [
     {
-      label: '',
+      label: 'Book',
+      render: (r) => {
+        const t = reservationTarget(r);
+        return (
+          <a className="cmpact" href={t.url} target="_blank" rel="noreferrer noopener">
+            <IconCalendar width={13} height={13} />
+            {/* Names the destination, so a fallback search never poses as a real booking. */}
+            {t.isSearch ? `Find on ${t.platform}` : (t.platform ?? 'Reserve')}
+          </a>
+        );
+      },
+    },
+    {
+      label: 'Directions',
       render: (r) => (
         <a
-          className="glance__maps"
+          className="cmpact"
           href={nativeMapsUrl(r.name, r.address)}
           target="_blank"
           rel="noreferrer noopener"
@@ -164,7 +189,19 @@ function CompareTable({ records, origin, onOpen }) {
         </a>
       ),
     },
-  ].filter((row) => !row.hide);
+    {
+      label: 'Call',
+      render: (r) =>
+        r.phone ? (
+          <a className="cmpact" href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}>
+            <IconPhone width={13} height={13} />
+            <span className="num">{r.phone}</span>
+          </a>
+        ) : (
+          <span className="glance__none">not listed</span>
+        ),
+    },
+  ];
 
   /*
    * The section header spans every column, but its contents are pinned to the
@@ -350,6 +387,24 @@ function CompareTable({ records, origin, onOpen }) {
                     ) : (
                       <span className="cmpdish__none">—</span>
                     )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+        </tbody>
+
+        {/* ---- quick actions, last because they're what you do once you've decided ---- */}
+        <tbody>
+          <SectionHead id="act" title="Quick actions" />
+          {open.act &&
+            actionRows.map((row) => (
+              <tr key={row.label}>
+                <th className="cmptbl__label" scope="row">
+                  {row.label}
+                </th>
+                {records.map((r) => (
+                  <td className="cmptbl__cell" key={r.id}>
+                    {row.render(r)}
                   </td>
                 ))}
               </tr>

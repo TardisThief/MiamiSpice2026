@@ -280,8 +280,8 @@ check('all three picks render', (await vis(page, '.pick').count()) === 3);
 check('comparison is a single table', (await vis(page, '.cmptbl').count()) === 1);
 const sections = await vis(page, '.cmptbl__sectionbtn span').allTextContents();
 check(
-  'all three sections present',
-  sections.join('|') === 'When they serve|At a glance|Menu',
+  'all four sections present, in order',
+  sections.join('|') === 'When they serve|At a glance|Menu|Quick actions',
   sections.join(' / '),
 );
 check(
@@ -314,6 +314,38 @@ check(
   'dish descriptions drop at three picks on mobile',
   (await vis(page, '.cmpdish__desc').count()) === 0 &&
     (await vis(page, '.cmpdish__name').count()) > 0,
+);
+
+// Quick actions: one row of each kind, still aligned to the right column.
+const actions = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.pane:not([hidden]) .cmptbl tbody')]
+    .pop()
+    .querySelectorAll('tr');
+  return [...rows]
+    .slice(1) // skip the section header row
+    .map((tr) => ({
+      label: tr.querySelector('.cmptbl__label')?.textContent?.trim(),
+      hrefs: [...tr.querySelectorAll('.cmpact')].map((a) => a.getAttribute('href')),
+    }));
+});
+check(
+  'quick actions offer book, directions and call',
+  actions.map((a) => a.label).join('|') === 'Book|Directions|Call',
+  actions.map((a) => a.label).join(' / '),
+);
+check(
+  'every pick gets a booking link',
+  actions[0]?.hrefs.length === 3 && actions[0].hrefs.every((h) => /^https?:\/\//.test(h)),
+  actions[0]?.hrefs[0],
+);
+check(
+  'directions hand off to a maps search, not our own pin',
+  actions[1]?.hrefs.every((h) => h.includes('google.com/maps/search')),
+);
+check(
+  'call rows dial a bare number',
+  actions[2]?.hrefs.every((h) => /^tel:\+?\d+$/.test(h)),
+  actions[2]?.hrefs[0] ?? 'none listed',
 );
 
 // Sections collapse independently, taking their rows with them.
