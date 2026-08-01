@@ -12,6 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { decodeEntities } from '../pipeline/lib/text.js';
 import {
   nameSimilarity,
   branchConflict,
@@ -660,4 +661,26 @@ test('haversine matches a known Miami distance', () => {
 test('Miami-Dade bounds accept local points and reject distant ones', () => {
   assert.equal(inMiamiDade({ lat: 25.7601, lng: -80.1951 }), true);
   assert.equal(inMiamiDade({ lat: 26.1224, lng: -80.1373 }), false); // Fort Lauderdale
+});
+
+/* ------------------------------------------------------------ text decoding */
+
+test('double-encoded entities are decoded, once', () => {
+  // The CMS ships `&amp;amp;`, so one decode by the HTML parser still leaves a
+  // literal `&amp;` for us to clear.
+  assert.equal(decodeEntities('107 Steak &amp; Bar'), '107 Steak & Bar');
+  assert.equal(decodeEntities('Lunch &#8211; Dinner'), 'Lunch – Dinner');
+  // Already-clean text is returned untouched, ampersand or not.
+  assert.equal(decodeEntities('Chop Steakhouse & Bar'), 'Chop Steakhouse & Bar');
+  assert.equal(decodeEntities('Plain text'), 'Plain text');
+});
+
+test('decoding never resurrects markup from plain text', () => {
+  // A stray angle bracket in prose must stay prose, not become a tag.
+  assert.equal(decodeEntities('Under <10 min &amp; worth it'), 'Under <10 min & worth it');
+});
+
+test('decoding tolerates non-strings', () => {
+  assert.equal(decodeEntities(null), null);
+  assert.equal(decodeEntities(undefined), undefined);
 });

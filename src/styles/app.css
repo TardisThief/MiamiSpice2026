@@ -1163,6 +1163,33 @@
   margin-bottom: var(--s-2);
 }
 
+.detail__sec--first {
+  border-top: none;
+  padding-top: var(--s-2);
+}
+
+.minimap {
+  height: 170px;
+  margin: var(--s-3) 0;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.minimap .leaflet-control-attribution {
+  font-size: 8.5px !important;
+}
+
+/* The mini-map pin never encodes selection, so it keeps a plain solid look. */
+.mk--mini {
+  box-shadow: 0 1px 4px oklch(0 0 0 / 0.35);
+}
+
+.detail__reserve {
+  margin-bottom: var(--s-2);
+}
+
 .detail__addr {
   margin: var(--s-3) 0;
   font-size: var(--t-base);
@@ -2277,6 +2304,240 @@
   font-weight: 600;
   color: var(--primary);
   text-decoration: none;
+}
+
+/* ---- the macro comparison table ---- */
+
+.cmptbl-wrap {
+  margin: 0 var(--s-4) var(--s-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  /* Both axes scroll inside this box, never the page. */
+  max-height: none;
+}
+
+/* Fixed layout so column widths come from the <colgroup> and not from whichever
+   restaurant happens to have the longest dish name. Auto layout let one column
+   swallow the viewport and pushed the rest off the right edge. */
+.cmptbl {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+  font-size: var(--t-sm);
+}
+
+.cmptbl__collabel {
+  width: 6.5rem;
+}
+
+.cmptbl__col {
+  width: 11rem;
+}
+
+.cmptbl th,
+.cmptbl td {
+  text-align: left;
+  vertical-align: top;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Sticky label column: with four columns of dishes you scroll both ways at once,
+   and a cell with no visible row heading is a floating string. */
+.cmptbl__corner,
+.cmptbl__label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+  border-right: 1px solid var(--line);
+}
+
+.cmptbl__label--course {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+}
+
+.cmptbl thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg);
+  border-bottom: 2px solid var(--line-strong);
+}
+
+.cmptbl__corner {
+  z-index: 4;
+}
+
+.cmptbl__head {
+  /* Long names wrap rather than widen the column. */
+  overflow-wrap: anywhere;
+}
+
+/* Fills its header cell so the tap target is the whole column heading, not just
+   the glyphs — this is the main way into a restaurant from the comparison. */
+.cmptbl__name {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 0;
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: var(--ink);
+  text-align: left;
+  line-height: var(--lh-snug);
+}
+
+.cmptbl__name:hover {
+  color: var(--primary);
+}
+
+.cmptbl__cell {
+  overflow-wrap: anywhere;
+}
+
+.cmptbl__price {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.cmptbl__note {
+  padding: 0 !important;
+}
+
+.cmptbl__noteinner {
+  position: sticky;
+  left: 0;
+  display: block;
+  /* Sized to stay readable inside the narrowest wrap rather than trailing off
+     the right edge of a table that is several viewports wide. */
+  width: max-content;
+  max-width: 17rem;
+  padding: 9px 12px;
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+}
+
+@media (min-width: 900px) {
+  .cmptbl__noteinner {
+    max-width: 34rem;
+  }
+}
+
+/* ---- collapsible section headers ---- */
+
+.cmptbl__section {
+  padding: 0 !important;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+/* The row spans every column so its tint reads as a band, but the controls are
+   pinned left so the section name and meal switcher survive a sideways scroll.
+   The sticky element has to be this div: `display: flex` on the <th> itself
+   removes it from table layout and corrupts every column width. */
+.cmptbl__sectioninner {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  width: max-content;
+  padding: 8px 12px;
+}
+
+/* Desktop has the room for descriptions, so the columns need to be wider. */
+@media (min-width: 900px) {
+  .cmptbl__collabel {
+    width: 8.5rem;
+  }
+
+  .cmptbl__col {
+    width: 15rem;
+  }
+}
+
+.cmptbl__sectionbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.cmptbl__chev {
+  transition: transform var(--d-base) var(--ease);
+  transform: rotate(-90deg);
+}
+
+.cmptbl__chev.is-open {
+  transform: rotate(0deg);
+}
+
+.cmptbl__meals {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.cmptbl__mealbtn {
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+  min-height: 28px;
+}
+
+.cmptbl__mealbtn.is-active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-soft-ink);
+}
+
+/* ---- day strip inside a cell ---- */
+
+.cmpdays {
+  display: inline-grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cmpday {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-sm);
+  font-size: 9.5px;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+
+.cmpday.is-on {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+/* Shared days carry both a fill and a ring, so the answer survives glare. */
+.cmpday.is-shared {
+  background: var(--primary);
+  color: var(--primary-ink);
+  box-shadow: 0 0 0 1.5px var(--primary-ring);
 }
 
 /* ---- menus: two-up columns ---- */

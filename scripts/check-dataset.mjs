@@ -103,6 +103,18 @@ if (withPrice < records.length * 0.5) {
   notes.push(`${withPrice} with a price`);
 }
 
+/* ---- Text quality: undecoded entities read as broken to every visitor ---- */
+
+const ENTITY = /&(?:amp|lt|gt|quot|apos|nbsp|#\d+|#x[0-9a-f]+);/i;
+const encoded = records.filter((r) => ENTITY.test(r.name ?? '') || ENTITY.test(r.description ?? ''));
+if (encoded.length) {
+  problems.push(
+    `${encoded.length} records carry undecoded HTML entities (e.g. ${encoded[0].name})`,
+  );
+} else {
+  notes.push('no undecoded HTML entities');
+}
+
 /* ---- Report ---- */
 
 for (const n of notes) console.log(`  ok    ${n}`);

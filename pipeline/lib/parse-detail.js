@@ -22,10 +22,11 @@
  */
 
 import * as cheerio from 'cheerio';
+import { decodeEntities } from './text.js';
 
 const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
+const clean = (s) => decodeEntities((s || '').replace(/\s+/g, ' ').trim());
 
 /** Strip HTML tags from the CMS description blobs. */
 function stripTags(html) {
@@ -35,6 +36,53 @@ function stripTags(html) {
       .replace(/<\/p>/gi, ' ')
       .replace(/<[^>]+>/g, ''),
   );
+}
+
+/**
+ * Normalise an outbound URL from the listing's action buttons.
+ *
+ * The source occasionally pastes a URL into a URL, producing values like
+ * `https://www.opentable.chttps://www.opentable.com/booking/...` — 5 of the 351
+ * listings do this. Taking the LAST protocol occurrence recovers the intended
+ * link; anything still unparseable is dropped rather than shipped as a link that
+ * would dead-end the user.
+ */
+function cleanOutboundUrl(href) {
+  if (!href) return null;
+  let url = href.trim();
+
+  const matches = [...url.matchAll(/https?:\/\//g)];
+  if (matches.length > 1) url = url.slice(matches[matches.length - 1].index);
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The listing's action buttons: "Reservations" and "Visit website".
+ *
+ * 313 of 351 listings carry a real booking link — OpenTable, Resy, SevenRooms,
+ * Tock or the restaurant's own system — which is far better than sending everyone
+ * to a generic search and hoping the right venue comes back.
+ */
+function parseActionLinks($) {
+  let reservation = null;
+  let website = null;
+
+  $('.info-buttons a[href]').each((_, a) => {
+    const label = clean($(a).text());
+    const href = cleanOutboundUrl($(a).attr('href'));
+    if (!href) return;
+    if (/reservation|book now|book a table/i.test(label)) reservation ??= href;
+    else if (/website|visit site/i.test(label)) website ??= href;
+  });
+
+  return { reservation, website };
 }
 
 function extractJsonLd($) {
@@ -289,6 +337,8 @@ export function parseDetail(html) {
     if (tel) phone = clean(decodeURIComponent(tel.replace(/^tel:/, '')));
   }
 
+  const { reservation, website } = parseActionLinks($);
+
   const { meals, raw_labels } = parseTemptationTables($);
   const { price_tiers, days_offered } = foldMeals(meals);
 
@@ -308,6 +358,8 @@ export function parseDetail(html) {
     listing_lat: hasGeo ? lat : null,
     listing_lng: hasGeo ? lng : null,
     phone,
+    reservation_url: reservation,
+    website_url: website,
     cuisine,
     price_class: priceClass,
     description: stripTags(business?.description) || null,

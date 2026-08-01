@@ -193,6 +193,58 @@ const roundTrip = await page.evaluate((payload) => {
 }, exported);
 check('import restores both stores', roundTrip.ov > 0 && roundTrip.ud > 0, `${roundTrip.ov} pins, ${roundTrip.ud} saved`);
 
+/* ------------------------------------------------------- detail card layout */
+
+console.log('\ndetail card');
+
+await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^List$/ }) }).click();
+await page.waitForTimeout(500);
+await page.locator('.row').first().click();
+await page.waitForSelector('.sheet[open]', { timeout: 10000 });
+await page.waitForTimeout(900);
+
+const cardOrder = await page.evaluate(() =>
+  [...document.querySelectorAll('.sheet[open] .detail__sec')]
+    .map((s) => {
+      const h = s.querySelector('.detail__h');
+      if (!h) return s.querySelector('.detail__about') ? '(about)' : null;
+      // The menu heading carries the price range alongside the words.
+      return h.firstChild.textContent.trim();
+    })
+    .filter(Boolean),
+);
+// About leads, the menu is the substance, logistics follow, and your own notes
+// sit last because they're the only part you can't read before you arrive.
+check(
+  'sections run about → menu → getting there → your list',
+  cardOrder.join(' → ') === '(about) → Miami Spice menu → Getting there → Your list',
+  cardOrder.join(' → '),
+);
+
+check('a mini-map renders under the address', (await page.locator('.sheet[open] .minimap').count()) === 1);
+const tiles = await page.locator('.sheet[open] .minimap img.leaflet-tile').count();
+check('mini-map actually loads tiles', tiles > 0, `${tiles} tiles`);
+check(
+  'mini-map is inert (no drag, no zoom control)',
+  (await page.locator('.sheet[open] .minimap .leaflet-control-zoom').count()) === 0 &&
+    (await page.locator('.sheet[open] .minimap.leaflet-drag-target').count()) === 0,
+);
+
+const reserve = page.locator('.sheet[open] .detail__reserve');
+check('a reservation button replaces the pin editor', (await reserve.count()) === 1);
+const reserveHref = await reserve.getAttribute('href');
+check('reservation link points somewhere real', /^https?:\/\//.test(reserveHref ?? ''), reserveHref);
+
+// Calibration is a maintenance tool; a public visitor should never meet it.
+const sheetText = await page.locator('.sheet[open]').innerText();
+check(
+  'no user-facing pin-fixing anywhere on the card',
+  !/fix this pin|calibrat/i.test(sheetText),
+);
+
+await page.keyboard.press('Escape');
+await page.waitForTimeout(400);
+
 /* ------------------------------------------------------------------ compare */
 
 console.log('\ncompare');
@@ -222,32 +274,62 @@ await page.locator('.tab', { has: page.locator('.tab__label', { hasText: /^Compa
 await page.waitForTimeout(900);
 
 check('all three picks render', (await vis(page, '.pick').count()) === 3);
-check('availability grid renders', (await vis(page, '.avail__block').count()) > 0);
-check('at-a-glance matrix renders', (await vis(page, '.glance__table').count()) === 1);
+
+// Everything lives in one table now, so the three sections stay column-aligned
+// with each other instead of each drawing its own grid.
+check('comparison is a single table', (await vis(page, '.cmptbl').count()) === 1);
+const sections = await vis(page, '.cmptbl__sectionbtn span').allTextContents();
 check(
-  'three picks use the course accordion, not columns',
-  (await vis(page, '.macc__item').count()) > 0 && (await vis(page, '.mcols').count()) === 0,
+  'all three sections present',
+  sections.join('|') === 'When they serve|At a glance|Menu',
+  sections.join(' / '),
+);
+check(
+  'one column per pick, plus the label column',
+  (await vis(page, '.cmptbl thead th').count()) === 4,
 );
 
-// The shared-availability claim must agree with the grid it's drawn from.
-const consistent = await page.evaluate(() => {
-  const shared = document.querySelector('.shared');
-  if (!shared) return 'no headline';
-  const ringed = document.querySelectorAll('.avail__dot.is-shared').length;
-  const rows = document.querySelectorAll('.avail__row').length;
-  const blocks = document.querySelectorAll('.avail__block').length;
-  const perBlock = rows / Math.max(blocks, 1);
-  // Every shared slot should be ringed once per restaurant.
-  return ringed % perBlock === 0 ? 'ok' : `ringed ${ringed} not divisible by ${perBlock}`;
-});
-check('shared slots match the grid', consistent === 'ok', consistent);
+// The whole point of the table is that it out-widths the phone and scrolls
+// sideways as one unit rather than clipping or overflowing the page.
+const geom = await page.evaluate(() => ({
+  table: document.querySelector('.cmptbl').scrollWidth,
+  wrap: document.querySelector('.cmptbl-wrap').clientWidth,
+  page: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+}));
+check('table side-scrolls inside its wrap', geom.table > geom.wrap, `${geom.table} > ${geom.wrap}`);
+check('and never spills the page sideways', geom.page === false);
 
-// Drop one and the layout must switch to two-up columns.
+// The shared-availability claim must agree with the day strips it's drawn from.
+const consistent = await page.evaluate(() => {
+  if (!document.querySelector('.shared')) return 'no headline';
+  const shared = document.querySelectorAll('.cmpday.is-shared').length;
+  const picks = document.querySelectorAll('.cmptbl thead th').length - 1;
+  // A shared slot is highlighted once per restaurant, so the count must divide.
+  return shared % picks === 0 ? 'ok' : `${shared} highlighted, not divisible by ${picks}`;
+});
+check('shared slots match the day strips', consistent === 'ok', consistent);
+
+// Three menus on a phone is too tight for prose, so descriptions drop out.
+check(
+  'dish descriptions drop at three picks on mobile',
+  (await vis(page, '.cmpdish__desc').count()) === 0 &&
+    (await vis(page, '.cmpdish__name').count()) > 0,
+);
+
+// Sections collapse independently, taking their rows with them.
+await vis(page, '.cmptbl__sectionbtn').first().click();
+await page.waitForTimeout(300);
+check('collapsing a section hides its rows', (await vis(page, '.cmpdays').count()) === 0);
+check('but leaves the other sections open', (await vis(page, '.cmpdish__name').count()) > 0);
+await vis(page, '.cmptbl__sectionbtn').first().click();
+await page.waitForTimeout(300);
+
+// Drop one and two menus have room for their descriptions again.
 await vis(page, '.pick__x').first().click();
 await page.waitForTimeout(700);
 check(
-  'two picks switch to side-by-side columns',
-  (await vis(page, '.mcols').count()) === 1 && (await vis(page, '.macc__item').count()) === 0,
+  'two picks get their dish descriptions back',
+  (await vis(page, '.cmpdish__desc').count()) > 0,
 );
 
 // Save as a named set, then confirm it survives a reload and reloads into the tray.
@@ -417,7 +499,13 @@ console.log('\ndesktop');
   // Map gets the same treatment, and selecting pans the map to the pin.
   await wp.locator('.tab', { has: wp.locator('.tab__label', { hasText: /^Map$/ }) }).click();
   await wp.waitForTimeout(3000);
-  check('map shows the detail pane too', (await wp.locator('.leaflet-container').count()) === 1 && (await wp.locator('.sidepane').count()) === 1);
+  // Scoped to `.map`: the detail pane carries its own mini-map, so a bare
+  // `.leaflet-container` count matches two things on this screen.
+  check(
+    'map shows the detail pane too',
+    (await wp.locator('.map.leaflet-container').count()) === 1 &&
+      (await wp.locator('.sidepane').count()) === 1,
+  );
 
   await wp.locator('.tab', { has: wp.locator('.tab__label', { hasText: /^List$/ }) }).click();
   await wp.waitForTimeout(400);

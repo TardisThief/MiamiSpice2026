@@ -1,9 +1,12 @@
 /**
  * Restaurant detail.
  *
- * Order follows the decision being made: can I go tonight and what does it cost,
- * then how do I get there, then everything else. The status picker sits high
- * because marking a place is the most common action after reading the price.
+ * Order follows the decision being made: what is this place, what does the Spice
+ * menu cost, how do I get there and book it — and only then your own marks and
+ * notes, which you add once you have decided it is worth remembering.
+ *
+ * Nothing here exposes pin calibration. That is a maintenance task and lives in
+ * Settings; a public visitor should never be invited to edit map data.
  *
  * Nulls are stated, never filled in. "Price not listed — check with the
  * restaurant" is more useful than a plausible number that might be wrong.
@@ -12,19 +15,26 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { formatDays, formatDishName, formatPriceRange, priceList } from '../lib/dataset.js';
-import { appleMapsUrl, formatDistance, isIos, nativeMapsUrl } from '../lib/geo.js';
+import {
+  appleMapsUrl,
+  formatDistance,
+  isIos,
+  nativeMapsUrl,
+  reservationTarget,
+} from '../lib/geo.js';
 import { ConfidenceNotice } from './ConfidenceBadge.jsx';
 import { Sheet } from './primitives.jsx';
 import { SplitHandle } from './SplitHandle.jsx';
+import { MiniMap } from './MiniMap.jsx';
 import { STATUSES, STATUS_LABELS } from '../lib/storage.js';
 import {
+  IconCalendar,
   IconChevronLeft,
   IconClose,
   IconCompare,
   IconLink,
   IconNavigate,
   IconPhone,
-  IconPin,
   IconSpark,
 } from './Icons.jsx';
 
@@ -270,11 +280,12 @@ function NotesField({ record }) {
  * inside a side pane on a desktop, rather than maintaining two copies that drift.
  */
 function DetailBody({ record: r }) {
-  const { closeDetail, origin, goToTab, openDetail } = useStore();
+  const { origin } = useStore();
 
   const price = formatPriceRange(r);
   const distance = origin && r.distance != null ? formatDistance(r.distance) : null;
   const mapsUrl = nativeMapsUrl(r.name, r.address);
+  const reservation = reservationTarget(r);
 
   return (
       <div className="detail">
@@ -310,6 +321,14 @@ function DetailBody({ record: r }) {
           </div>
         )}
 
+        {/* What the place actually is, before what it costs — you decide whether
+            you fancy it at all before you compare prices. */}
+        {r.description && (
+          <section className="detail__sec detail__sec--first">
+            <p className="detail__about">{r.description}</p>
+          </section>
+        )}
+
         <section className="detail__sec">
           <h3 className="detail__h">
             Miami Spice menu {price && <span className="detail__h-price num">{price}</span>}
@@ -332,13 +351,6 @@ function DetailBody({ record: r }) {
         </section>
 
         <section className="detail__sec">
-          <h3 className="detail__h">Your list</h3>
-          <StatusPicker record={r} />
-          <NotesField record={r} />
-          <CompareStatusLine record={r} />
-        </section>
-
-        <section className="detail__sec">
           <h3 className="detail__h">Getting there</h3>
           <ConfidenceNotice record={r} />
           {r.address ? (
@@ -347,15 +359,34 @@ function DetailBody({ record: r }) {
             <p className="detail__addr detail__addr--none">No street address published.</p>
           )}
 
+          {/* A glance at where it actually is, before committing to a tap-through. */}
+          <MiniMap record={r} />
+
+          <a
+            className="btn btn--primary btn--full detail__reserve"
+            href={reservation.url}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            <IconCalendar width={17} height={17} />
+            {reservation.label}
+          </a>
+          {reservation.isSearch && (
+            <p className="detail__fine">
+              This one doesn't publish a booking link, so that searches OpenTable near the
+              restaurant. Calling is often faster.
+            </p>
+          )}
+
           <div className="detail__actions">
             <a
-              className="btn btn--primary"
+              className="btn btn--ghost"
               href={mapsUrl}
               target="_blank"
               rel="noreferrer noopener"
             >
               <IconNavigate width={17} height={17} />
-              Open in Maps
+              Directions
             </a>
             {isIos() && (
               <a className="btn btn--ghost" href={appleMapsUrl(r.name, r.address)}>
@@ -368,33 +399,32 @@ function DetailBody({ record: r }) {
                 {r.phone}
               </a>
             )}
+            {r.website_url && (
+              <a
+                className="btn btn--ghost"
+                href={r.website_url}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <IconLink width={17} height={17} />
+                Website
+              </a>
+            )}
           </div>
           <p className="detail__fine">
-            Maps searches by name and address rather than our pin — it has a better database for
-            hotel and mall venues than we do.
+            Directions search by name and address rather than our pin — Google and Apple have a
+            better database for hotel and mall venues than we do.
           </p>
-
-          <button
-            type="button"
-            className="btn btn--ghost btn--full"
-            onClick={() => {
-              closeDetail();
-              goToTab('calibrate');
-              // Re-open as the calibrate target once that view mounts.
-              setTimeout(() => openDetail(r.id), 0);
-            }}
-          >
-            <IconPin width={17} height={17} />
-            {r.geo_confidence === 'verified' ? 'Adjust this pin' : 'Fix this pin'}
-          </button>
         </section>
 
-        {r.description && (
-          <section className="detail__sec">
-            <h3 className="detail__h">About</h3>
-            <p className="detail__about">{r.description}</p>
-          </section>
-        )}
+        {/* Below Getting there: your own marks and notes are the last thing you
+            add, once you've decided the place is worth remembering. */}
+        <section className="detail__sec">
+          <h3 className="detail__h">Your list</h3>
+          <StatusPicker record={r} />
+          <NotesField record={r} />
+          <CompareStatusLine record={r} />
+        </section>
 
         <section className="detail__sec">
           {r.possible_duplicate && (

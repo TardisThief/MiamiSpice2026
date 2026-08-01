@@ -65,6 +65,8 @@ function toPublicRecord(r) {
     geo_flags: r.geo_flags ?? [],
     geo_notes: r.geo_notes ?? [],
     phone: d.phone ?? null,
+    reservation_url: d.reservation_url ?? null,
+    website_url: d.website_url ?? null,
     cuisine: d.cuisine ?? null,
     price_class: d.price_class ?? null,
     reserve: !!r.reserve,

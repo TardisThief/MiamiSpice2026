@@ -61,6 +61,57 @@ export function appleMapsUrl(name, address) {
   return `maps://?q=${query}`;
 }
 
+/** Recognisable booking platforms, so the button can say where it goes. */
+const BOOKING_PLATFORMS = [
+  [/(^|\.)opentable\./i, 'OpenTable'],
+  [/(^|\.)resy\.com$/i, 'Resy'],
+  [/sevenrooms\./i, 'SevenRooms'],
+  [/exploretock\.com$/i, 'Tock'],
+  [/(^|\.)yelp\./i, 'Yelp'],
+  [/quandoo\./i, 'Quandoo'],
+  [/eatapp\.co$/i, 'Eat App'],
+  [/tablecheck\./i, 'TableCheck'],
+];
+
+/**
+ * Where "Reserve" should send you, and what to call it.
+ *
+ * 313 of the 351 listings publish a real booking link. For the rest, an OpenTable
+ * search scoped to the restaurant's own coordinates is a far better guess than a
+ * bare name search, which in a city with six Novecentos lands you at the wrong
+ * one. The label always names the destination so the button never lies about
+ * where it goes.
+ */
+export function reservationTarget(record) {
+  if (record?.reservation_url) {
+    let platform = null;
+    try {
+      const host = new URL(record.reservation_url).hostname;
+      platform = BOOKING_PLATFORMS.find(([re]) => re.test(host))?.[1] ?? null;
+    } catch {
+      /* Already validated in the pipeline; fall through to an unlabelled link. */
+    }
+    return {
+      url: record.reservation_url,
+      platform,
+      label: platform ? `Reserve on ${platform}` : 'Make a reservation',
+      isSearch: false,
+    };
+  }
+
+  const params = new URLSearchParams({ term: record?.name ?? '' });
+  if (Number.isFinite(record?.lat) && Number.isFinite(record?.lng)) {
+    params.set('latitude', String(record.lat));
+    params.set('longitude', String(record.lng));
+  }
+  return {
+    url: `https://www.opentable.com/s?${params}`,
+    platform: 'OpenTable',
+    label: 'Look for a table',
+    isSearch: true,
+  };
+}
+
 export function isIos() {
   if (typeof navigator === 'undefined') return false;
   return (

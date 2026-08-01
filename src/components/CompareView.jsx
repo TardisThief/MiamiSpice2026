@@ -27,11 +27,12 @@ import {
   offeredMeals,
   sharedSlots,
 } from '../lib/compare.js';
-import { DAYS, formatDays, formatDishName, formatPriceRange, priceList } from '../lib/dataset.js';
+import { formatDays, formatDishName, formatPriceRange } from '../lib/dataset.js';
 import { formatDistance, nativeMapsUrl } from '../lib/geo.js';
 import { ConfidenceBadge } from './ConfidenceBadge.jsx';
 import { Chip, EmptyState, Sheet } from './primitives.jsx';
 import { FilterSheet } from './FilterSheet.jsx';
+import { useMediaQuery } from '../lib/useMediaQuery.js';
 import {
   IconChevronDown,
   IconChevronRight,
@@ -74,89 +75,161 @@ function SharedHeadline({ records }) {
   );
 }
 
-/* --------------------------------------------------------- availability grid */
+/* ----------------------------------------------------------- the macro table */
 
-function AvailabilityGrid({ records }) {
+/**
+ * One table, restaurants as columns, everything aligned to them.
+ *
+ * Three stacked tables meant three different column widths for the same four
+ * restaurants, so the eye had to re-find "which column is Komodo" at every
+ * section. Here the columns are established once and every fact — serving days,
+ * price, dishes — lines up under the same heading.
+ *
+ * The header row and the label column are both sticky, because with four columns
+ * of dishes you are scrolling in both directions at once and a cell with no
+ * visible row or column heading is just a floating string.
+ *
+ * Sections collapse so you can shrink what you have already decided on: settle
+ * the night, fold "When they serve" away, and the menus move up the screen.
+ */
+function CompareTable({ records, origin, onOpen }) {
+  const [open, setOpen] = useState({ serve: true, glance: true, menu: true });
+  const toggle = (key) => setOpen((o) => ({ ...o, [key]: !o[key] }));
+
+  const meals = useMemo(() => offeredMeals(records), [records]);
+  const [meal, setMeal] = useState(() => bestSharedMeal(records));
+  useEffect(() => {
+    const best = bestSharedMeal(records);
+    setMeal((cur) => (cur && meals.includes(cur) ? cur : best));
+  }, [records, meals]);
+
   const blocks = useMemo(() => availabilityByMeal(records), [records]);
-  if (!blocks.length) return null;
-
-  return (
-    <div className="avail">
-      {blocks.map((block) => (
-        <div className="avail__block" key={block.meal}>
-          <div className="avail__head">
-            <span className="avail__meal">{MEAL_LABEL[block.meal] ?? block.meal}</span>
-            <span className="avail__days" aria-hidden="true">
-              {DAYS.map((d) => (
-                <span
-                  key={d}
-                  className={`avail__day ${
-                    block.days.find((x) => x.day === d)?.all ? 'is-shared' : ''
-                  }`}
-                >
-                  {d[0]}
-                </span>
-              ))}
-            </span>
-          </div>
-
-          {records.map((r, i) => (
-            <div className="avail__row" key={r.id}>
-              <span className="avail__name">{r.name}</span>
-              <span className="avail__dots">
-                {block.days.map((d) => (
-                  <span
-                    key={d.day}
-                    className={`avail__dot ${d.per[i] ? 'is-on' : ''} ${
-                      d.per[i] && d.all ? 'is-shared' : ''
-                    }`}
-                    title={`${r.name} · ${d.day} ${block.meal}: ${d.per[i] ? 'yes' : 'no'}`}
-                  >
-                    <span className="sr-only">
-                      {d.day} {d.per[i] ? 'available' : 'not available'}
-                    </span>
-                  </span>
-                ))}
-              </span>
-            </div>
-          ))}
-        </div>
-      ))}
-      <p className="avail__legend">Filled dots are serving days; ringed dots are shared by all.</p>
-    </div>
+  const { courses } = useMemo(
+    () => (meal ? alignMenus(records, meal) : { courses: [] }),
+    [records, meal],
   );
-}
 
-/* ----------------------------------------------------------- at-a-glance ---- */
+  /*
+   * Dish descriptions are dropped once the columns get narrow. Two columns on a
+   * phone leave room for them; four do not, and a description wrapped into six
+   * words per line is harder to read than no description at all. A desktop has
+   * width for all four.
+   */
+  const roomy = useMediaQuery('(min-width: 900px)');
+  const showDescriptions = roomy || records.length <= 2;
 
-function GlanceMatrix({ records, origin, onOpen }) {
-  const rows = [
+  const glanceRows = [
     {
       label: 'Price',
-      render: (r) => formatPriceRange(r) ?? <span className="glance__none">not listed</span>,
-      strong: true,
+      render: (r) => (
+        <span className="cmptbl__price num">
+          {formatPriceRange(r) ?? <span className="glance__none">not listed</span>}
+        </span>
+      ),
     },
     {
       label: 'Distance',
-      render: (r) =>
-        origin && r.distance != null ? formatDistance(r.distance) : <span className="glance__none">—</span>,
       hide: !origin,
+      render: (r) =>
+        r.distance != null ? (
+          <span className="num">{formatDistance(r.distance)}</span>
+        ) : (
+          <span className="glance__none">—</span>
+        ),
     },
     { label: 'Area', render: (r) => r.neighborhood },
     { label: 'Cuisine', render: (r) => r.cuisine ?? <span className="glance__none">—</span> },
-  ];
+    {
+      label: 'Pin',
+      render: (r) => (
+        <>
+          <ConfidenceBadge tier={r.geo_confidence} compact />
+          {['verified', 'poi_match', 'address_exact'].includes(r.geo_confidence) && (
+            <span className="glance__ok">Located</span>
+          )}
+        </>
+      ),
+    },
+    {
+      label: '',
+      render: (r) => (
+        <a
+          className="glance__maps"
+          href={nativeMapsUrl(r.name, r.address)}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          <IconNavigate width={13} height={13} />
+          Maps
+        </a>
+      ),
+    },
+  ].filter((row) => !row.hide);
+
+  /*
+   * The section header spans every column, but its contents are pinned to the
+   * left so the label and the meal switcher stay on screen while you scroll
+   * sideways through the restaurants. The sticky element is the inner div, not
+   * the <th> — making a table cell `display: flex` takes it out of table layout
+   * and distorts every column width in the table.
+   */
+  const SectionHead = ({ id, title, children }) => (
+    <tr className="cmptbl__sectionrow">
+      <th className="cmptbl__section" colSpan={records.length + 1} scope="colgroup">
+        <div className="cmptbl__sectioninner">
+          <button
+            type="button"
+            className="cmptbl__sectionbtn"
+            aria-expanded={open[id]}
+            onClick={() => toggle(id)}
+          >
+            <IconChevronDown
+              width={15}
+              height={15}
+              className={`cmptbl__chev ${open[id] ? 'is-open' : ''}`}
+            />
+            <span>{title}</span>
+          </button>
+          {children}
+        </div>
+      </th>
+    </tr>
+  );
+
+  /*
+   * Footnotes belong to the table but not to any column, so they span the whole
+   * width — including the label column — and pin their text to the left edge.
+   * Sitting them in the first restaurant column instead left them clipped
+   * mid-sentence on a phone, which reads as a rendering bug rather than a note.
+   */
+  const NoteRow = ({ children }) => (
+    <tr>
+      <td className="cmptbl__note" colSpan={records.length + 1}>
+        <span className="cmptbl__noteinner">{children}</span>
+      </td>
+    </tr>
+  );
 
   return (
-    <div className="glance scroll-x">
-      <table className="glance__table">
+    <div className="cmptbl-wrap scroll-x">
+      <table className="cmptbl">
+        {/* Fixed layout with explicit widths: without it the browser sizes columns
+            from content, and one long dish name makes a column twice its neighbour. */}
+        <colgroup>
+          <col className="cmptbl__collabel" />
+          {records.map((r) => (
+            <col className="cmptbl__col" key={r.id} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
-            <th scope="col" className="glance__corner" />
+            <th className="cmptbl__corner" scope="col">
+              <span className="sr-only">Attribute</span>
+            </th>
             {records.map((r) => (
-              <th scope="col" key={r.id} className="glance__name">
-                <button type="button" className="glance__namebtn" onClick={() => onOpen(r.id)}>
+              <th className="cmptbl__head" key={r.id} scope="col">
+                <button type="button" className="cmptbl__name" onClick={() => onOpen(r.id)}>
                   {r.name}
-                  <IconChevronRight width={13} height={13} />
                 </button>
                 {r.reserve && (
                   <span className="tag tag--reserve tag--sm">
@@ -168,52 +241,119 @@ function GlanceMatrix({ records, origin, onOpen }) {
             ))}
           </tr>
         </thead>
+
+        {/* ---- when they serve ---- */}
         <tbody>
-          {rows
-            .filter((row) => !row.hide)
-            .map((row) => (
-              <tr key={row.label}>
-                <th scope="row" className="glance__label">
+          <SectionHead id="serve" title="When they serve" />
+          {open.serve &&
+            blocks.map((block) => (
+              <tr key={block.meal}>
+                <th className="cmptbl__label" scope="row">
+                  {MEAL_LABEL[block.meal] ?? block.meal}
+                </th>
+                {records.map((r, i) => (
+                  <td className="cmptbl__cell" key={r.id}>
+                    <span className="cmpdays">
+                      {block.days.map((d) => (
+                        <span
+                          key={d.day}
+                          className={`cmpday ${d.per[i] ? 'is-on' : ''} ${
+                            d.per[i] && d.all ? 'is-shared' : ''
+                          }`}
+                          title={`${d.day}: ${d.per[i] ? 'yes' : 'no'}`}
+                        >
+                          {d.day[0]}
+                        </span>
+                      ))}
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          {open.serve && (
+            <NoteRow>Highlighted days are ones every pick serves that meal.</NoteRow>
+          )}
+        </tbody>
+
+        {/* ---- at a glance ---- */}
+        <tbody>
+          <SectionHead id="glance" title="At a glance" />
+          {open.glance &&
+            glanceRows.map((row, ri) => (
+              <tr key={row.label || `row-${ri}`}>
+                <th className="cmptbl__label" scope="row">
                   {row.label}
                 </th>
                 {records.map((r) => (
-                  <td key={r.id} className={`glance__cell ${row.strong ? 'glance__cell--strong num' : ''}`}>
+                  <td className="cmptbl__cell" key={r.id}>
                     {row.render(r)}
                   </td>
                 ))}
               </tr>
             ))}
-          <tr>
-            <th scope="row" className="glance__label">
-              Pin
-            </th>
-            {records.map((r) => (
-              <td key={r.id} className="glance__cell">
-                <ConfidenceBadge tier={r.geo_confidence} compact />
-                {r.geo_confidence === 'poi_match' ||
-                r.geo_confidence === 'address_exact' ||
-                r.geo_confidence === 'verified' ? (
-                  <span className="glance__ok">Located</span>
-                ) : null}
-              </td>
+        </tbody>
+
+        {/* ---- menu ---- */}
+        <tbody>
+          <SectionHead id="menu" title="Menu">
+            {meals.length > 1 && (
+              <span className="cmptbl__meals">
+                {meals.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`cmptbl__mealbtn ${m === meal ? 'is-active' : ''}`}
+                    aria-pressed={m === meal}
+                    onClick={() => setMeal(m)}
+                  >
+                    {MEAL_LABEL[m] ?? m}
+                  </button>
+                ))}
+              </span>
+            )}
+          </SectionHead>
+
+          {open.menu && !courses.length && (
+            <NoteRow>
+              {meals.length
+                ? `None of these published a ${(MEAL_LABEL[meal] ?? meal).toLowerCase()} menu.`
+                : 'No published menus to compare.'}
+            </NoteRow>
+          )}
+
+          {open.menu &&
+            courses.map((course) => (
+              <tr key={course.name}>
+                <th className="cmptbl__label cmptbl__label--course" scope="row">
+                  {course.name}
+                </th>
+                {course.byRecord.map((cell) => (
+                  <td className="cmptbl__cell cmptbl__cell--menu" key={cell.record.id}>
+                    {cell.variants.length ? (
+                      cell.variants.map((v, j) => (
+                        <div className="cmpdish" key={j}>
+                          {cell.variants.length > 1 && (
+                            <span className="cmpdish__variant num">${v.price}</span>
+                          )}
+                          <ul className="cmpdish__list">
+                            {v.items.map((item, k) => (
+                              <li key={k}>
+                                <span className="cmpdish__name">{formatDishName(item.name)}</span>
+                                {showDescriptions && item.description && (
+                                  <span className="cmpdish__desc">{item.description}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="cmpdish__none">—</span>
+                    )}
+                  </td>
+                ))}
+              </tr>
             ))}
-          </tr>
-          <tr>
-            <th scope="row" className="glance__label" />
-            {records.map((r) => (
-              <td key={r.id} className="glance__cell">
-                <a
-                  className="glance__maps"
-                  href={nativeMapsUrl(r.name, r.address)}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  <IconNavigate width={13} height={13} />
-                  Maps
-                </a>
-              </td>
-            ))}
-          </tr>
         </tbody>
       </table>
     </div>
@@ -221,192 +361,6 @@ function GlanceMatrix({ records, origin, onOpen }) {
 }
 
 /* ------------------------------------------------------------------- menus */
-
-function DishList({ items }) {
-  return (
-    <ul className="cmpdish__list">
-      {items.map((item, i) => (
-        <li key={i}>
-          <span className="cmpdish__name">{formatDishName(item.name)}</span>
-          {item.description && <span className="cmpdish__desc">{item.description}</span>}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** True side-by-side columns, aligned course by course. */
-function MenuColumns({ records, courses, perRecord }) {
-  // One column per restaurant, however many there are — the caller only chooses
-  // this layout when there's width for them.
-  const style = { '--mcols-count': records.length };
-  return (
-    <div className="mcols" style={style}>
-      <div className="mcols__head">
-        {perRecord.map((entry) => (
-          <div className="mcols__col" key={entry.record.id}>
-            <span className="mcols__name">{entry.record.name}</span>
-            <span className="mcols__price num">
-              {entry.menus.map((m) => `$${m.price}`).join(' / ') || '—'}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {courses.map((course) => (
-        <div className="mcols__course" key={course.name}>
-          <h4 className="course__name">{course.name}</h4>
-          <div className="mcols__row">
-            {course.byRecord.map((cell, i) => (
-              <div className="mcols__col" key={records[i].id}>
-                {cell.variants.length ? (
-                  cell.variants.map((v, j) => (
-                    <div className="cmpdish" key={j}>
-                      {cell.variants.length > 1 && (
-                        <span className="cmpdish__variant num">${v.price}</span>
-                      )}
-                      <DishList items={v.items} />
-                    </div>
-                  ))
-                ) : (
-                  <span className="cmpdish__none">—</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Three or four picks: expand a course, see everyone's dishes for it. */
-function MenuAccordion({ courses }) {
-  const [open, setOpen] = useState(() => new Set([0]));
-
-  const toggle = (i) =>
-    setOpen((cur) => {
-      const next = new Set(cur);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
-
-  return (
-    <div className="macc">
-      {courses.map((course, i) => {
-        const isOpen = open.has(i);
-        return (
-          <div className={`macc__item ${isOpen ? 'is-open' : ''}`} key={course.name}>
-            <button
-              type="button"
-              className="macc__head"
-              aria-expanded={isOpen}
-              onClick={() => toggle(i)}
-            >
-              <span className="macc__name">{course.name}</span>
-              <IconChevronDown
-                width={16}
-                height={16}
-                className={`macc__chev ${isOpen ? 'is-open' : ''}`}
-              />
-            </button>
-
-            {isOpen && (
-              <div className="macc__body">
-                {course.byRecord.map((cell) => (
-                  <div className="macc__rest" key={cell.record.id}>
-                    <span className="macc__restname">{cell.record.name}</span>
-                    {cell.variants.length ? (
-                      cell.variants.map((v, j) => (
-                        <div className="cmpdish" key={j}>
-                          {cell.variants.length > 1 && (
-                            <span className="cmpdish__variant num">${v.price}</span>
-                          )}
-                          <DishList items={v.items} />
-                        </div>
-                      ))
-                    ) : (
-                      <span className="cmpdish__none">Nothing published for this course</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * True when the viewport is wide enough for real side-by-side menu columns.
- *
- * The 2-vs-3+ layout switch exists because of phone width, not because of some
- * inherent property of comparing three things. On a desktop there's room for four
- * columns at ~250px each, so the constraint lifts and the better layout wins.
- */
-function useWideEnoughForColumns(count) {
-  const query = `(min-width: ${count * 240 + 120}px)`;
-  const [wide, setWide] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia?.(query).matches,
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia?.(query);
-    if (!mq) return;
-    const onChange = (e) => setWide(e.matches);
-    setWide(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, [query]);
-
-  return wide;
-}
-
-function MenuSection({ records }) {
-  const meals = useMemo(() => offeredMeals(records), [records]);
-  const [meal, setMeal] = useState(() => bestSharedMeal(records));
-  const wideEnough = useWideEnoughForColumns(records.length);
-
-  // Re-pick the default when the selection changes under us.
-  useEffect(() => {
-    const best = bestSharedMeal(records);
-    setMeal((cur) => (cur && meals.includes(cur) ? cur : best));
-  }, [records, meals]);
-
-  const { courses, perRecord } = useMemo(
-    () => (meal ? alignMenus(records, meal) : { courses: [], perRecord: [] }),
-    [records, meal],
-  );
-
-  if (!meals.length) {
-    return <p className="cmp__none">No published menus to compare for these.</p>;
-  }
-
-  return (
-    <>
-      {meals.length > 1 && (
-        <div className="chiprow scroll-x cmp__meals">
-          {meals.map((m) => (
-            <Chip key={m} active={m === meal} onClick={() => setMeal(m)}>
-              {MEAL_LABEL[m] ?? m}
-            </Chip>
-          ))}
-        </div>
-      )}
-
-      {!courses.length ? (
-        <p className="cmp__none">None of these published a {MEAL_LABEL[meal] ?? meal} menu.</p>
-      ) : records.length === 2 || wideEnough ? (
-        <MenuColumns records={records} courses={courses} perRecord={perRecord} />
-      ) : (
-        <MenuAccordion courses={courses} />
-      )}
-    </>
-  );
-}
 
 /* -------------------------------------------------------------- save sheet */
 
@@ -611,20 +565,7 @@ export function CompareView() {
           <SharedHeadline records={compareRecords} />
         )}
 
-        <section className="cmp__sec">
-          <h2 className="cmp__h">When they serve</h2>
-          <AvailabilityGrid records={compareRecords} />
-        </section>
-
-        <section className="cmp__sec">
-          <h2 className="cmp__h">At a glance</h2>
-          <GlanceMatrix records={compareRecords} origin={origin} onOpen={openDetail} />
-        </section>
-
-        <section className="cmp__sec">
-          <h2 className="cmp__h">Menus</h2>
-          <MenuSection records={compareRecords} />
-        </section>
+        <CompareTable records={compareRecords} origin={origin} onOpen={openDetail} />
       </div>
 
       <SaveSheet open={saveOpen} onClose={() => setSaveOpen(false)} />

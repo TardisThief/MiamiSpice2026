@@ -16,6 +16,7 @@ import * as cheerio from 'cheerio';
 import { fetchCached, ROOT } from './lib/http.js';
 import { SPEC_SNAPSHOT_COUNTS, NEIGHBORHOODS } from './lib/neighborhoods.js';
 import { isMain } from './lib/cli.js';
+import { decodeEntities } from './lib/text.js';
 
 const DIRECTORY_URL =
   'https://www.miamiandbeaches.com/deals/spice-restaurant-months/participating-restaurants-at-a-glance';
@@ -35,7 +36,7 @@ export function parseListingUrl(href) {
 }
 
 function cleanText(s) {
-  return (s || '').replace(/\s+/g, ' ').trim();
+  return decodeEntities((s || '').replace(/\s+/g, ' ').trim());
 }
 
 export function parseDirectory(html) {
