@@ -264,8 +264,19 @@
   flex-shrink: 0;
 }
 
-/* The filter pill that opens a checklist — shaped to match the chips beside it. */
+/*
+ * The filter pill that opens a checklist — shaped to match the chips beside it.
+ *
+ * Lifted above the dismissing backdrop (89) so it stays pressable while its own
+ * panel is open. Without this the backdrop swallowed the press: the pill was the
+ * one control you could not use to close the thing it had opened, and pressing
+ * another pill did nothing at all. Nothing else in the app goes above 50, and a
+ * native <dialog> renders in the top layer regardless, so this is out of
+ * everything else's way.
+ */
 .selfilter__control {
+  position: relative;
+  z-index: 95;
   display: inline-flex;
   align-items: center;
   gap: 6px;

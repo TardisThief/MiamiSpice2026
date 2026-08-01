@@ -18,6 +18,17 @@ import { IconChevronDown, IconClose, IconSearch } from './Icons.jsx';
 const PANEL_MAX_H = 340;
 const GAP = 6;
 
+/*
+ * Only one picker is open at a time, coordinated here rather than by lifting the
+ * state into every screen that uses one. Without it, pressing the cuisine pill
+ * while the day pill is open would leave two panels stacked over each other.
+ */
+let nextId = 0;
+const pickers = new Set();
+const announceOpen = (id) => {
+  for (const close of pickers) close(id);
+};
+
 export function MultiSelect({
   icon,
   options,
@@ -36,6 +47,23 @@ export function MultiSelect({
   const [pos, setPos] = useState(null);
   const triggerRef = useRef(null);
   const panelRef = useRef(null);
+  const idRef = useRef(null);
+  if (idRef.current === null) idRef.current = nextId++;
+
+  // Close when a different picker opens.
+  useEffect(() => {
+    const close = (openedId) => {
+      if (openedId !== idRef.current) setOpen(false);
+    };
+    pickers.add(close);
+    return () => pickers.delete(close);
+  }, []);
+
+  const toggleOpen = () =>
+    setOpen((wasOpen) => {
+      if (!wasOpen) announceOpen(idRef.current);
+      return !wasOpen;
+    });
 
   const searchable = options.length >= searchThreshold;
 
@@ -125,7 +153,7 @@ export function MultiSelect({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`Filter by ${noun}${selected.length ? `: ${label}` : ''}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
       >
         {icon}
         <span className="selfilter__label">{label}</span>

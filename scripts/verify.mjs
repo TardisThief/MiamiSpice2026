@@ -763,7 +763,37 @@ console.log('\nshortcuts');
   const jpIt = await countNow();
   check('two cuisines are a union', jpIt > jp, `${jp} -> ${jpIt} Japanese or Italian`);
 
+  /*
+   * The pill must stay pressable while its own panel is open — it is the most
+   * obvious way to dismiss it, and a backdrop that swallows the press makes the
+   * pill the one control that cannot close the thing it opened.
+   */
+  const cuisinePill = sp.getByRole('button', { name: /^Filter by cuisine/ });
+  await cuisinePill.click();
+  await sp.waitForTimeout(500);
+  check('pressing the pill again closes its panel', (await sp.locator('.msel').count()) === 0);
+  check('and keeps the selection', (await countNow()) === jpIt, `${await countNow()}`);
+  await cuisinePill.click();
+  await sp.waitForTimeout(500);
+  check('pressing it once more reopens', (await sp.locator('.msel').count()) === 1);
+
+  // Switching straight from one picker to the other, without a dismissing tap.
+  await sp.getByRole('button', { name: /^Filter by day/ }).click();
+  await sp.waitForTimeout(500);
+  const panelLabels = await sp.locator('.msel').evaluateAll((els) =>
+    els.map((e) => e.getAttribute('aria-label')),
+  );
+  check(
+    'pressing the other pill swaps panels rather than stacking them',
+    panelLabels.length === 1 && panelLabels[0] === 'Choose days',
+    panelLabels.join(' + ') || 'none open',
+  );
+  await sp.getByRole('button', { name: /^Filter by day/ }).click();
+  await sp.waitForTimeout(400);
+
   // Dismissing the panel must not also activate whatever sits underneath it.
+  await cuisinePill.click();
+  await sp.waitForTimeout(500);
   await sp.mouse.click(200, 700);
   await sp.waitForTimeout(500);
   check('clicking away closes the picker', (await sp.locator('.msel').count()) === 0);
