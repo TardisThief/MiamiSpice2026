@@ -245,6 +245,36 @@ check(
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);
 
+/*
+ * The location caveat is advice about the restaurant, not a report on our
+ * pipeline. It used to print the resolver's working underneath it — "sources
+ * disagree: listing_jsonld is 2846 m away" — which reads as an error message
+ * about us rather than guidance about where to eat. That detail still exists on
+ * the record, in geocode-review.md, and in Calibrate.
+ *
+ * Driven off the Approximate badge rather than a named restaurant, so the check
+ * follows the data instead of breaking whenever a pin gets corroborated.
+ */
+const approxRow = page.locator('.pane:not([hidden]) .row', { hasText: 'Approximate' }).first();
+if (await approxRow.count()) {
+  await approxRow.click();
+  await page.waitForSelector('.sheet[open]', { timeout: 10000 });
+  await page.waitForTimeout(700);
+  const caveat = page.locator('.sheet[open] .notice--warn, .sheet[open] .notice--unknown').first();
+  const text = (await caveat.count()) ? (await caveat.innerText()).trim() : '';
+  check('an approximate pin carries a caveat', !!text);
+  check('the caveat is one sentence', text.split('\n').length === 1, text.slice(0, 62));
+  check(
+    'and no resolver internals leak into it',
+    !!text && !/(corroborat|nominatim|overpass|census|listing_jsonld|geocoder|\bm away\b)/i.test(text),
+    text.slice(0, 80),
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+} else {
+  check('an approximate pin was available to check the caveat', false, 'no Approximate row found');
+}
+
 /* ------------------------------------------------------------------ compare */
 
 console.log('\ncompare');
@@ -704,6 +734,34 @@ console.log('\nshortcuts');
   const countNow = async () =>
     Number((await sp.locator('.listbar__count').textContent()).split(' ')[0]);
 
+  /*
+   * Three rows, in order: the pickers, the chips, then the sort. One mixed
+   * scrolling strip meant the price chips lived permanently off the right edge.
+   */
+  const layout = await sp.evaluate(() =>
+    [...document.querySelectorAll('.pane:not([hidden]) .chiprow, .pane:not([hidden]) .listbar')].map(
+      (el) => ({
+        kind: el.classList.contains('chiprow--selects')
+          ? 'pickers'
+          : el.classList.contains('listbar')
+            ? 'sort'
+            : 'chips',
+        top: Math.round(el.getBoundingClientRect().top),
+        controls: el.querySelectorAll('button, .chip').length,
+      }),
+    ),
+  );
+  check(
+    'filters are laid out as pickers, chips, then sort',
+    layout.map((l) => l.kind).join(' / ') === 'pickers / chips / sort',
+    layout.map((l) => `${l.kind}@${l.top}`).join(' '),
+  );
+  check(
+    'each row is below the last',
+    layout.every((l, i) => i === 0 || l.top > layout[i - 1].top),
+  );
+  check('the picker row holds day, cuisine and neighborhood', layout[0]?.controls === 3);
+
   const openPicker = async (which) => {
     await sp.getByRole('button', { name: new RegExp(`^Filter by ${which}`) }).click();
     await sp.waitForSelector('.msel', { timeout: 5000 });
@@ -789,6 +847,24 @@ console.log('\nshortcuts');
     panelLabels.join(' + ') || 'none open',
   );
   await sp.getByRole('button', { name: /^Filter by day/ }).click();
+  await sp.waitForTimeout(400);
+
+  // Neighborhood is a picker on the same row, not a sheet-only filter.
+  await openPicker('neighborhood');
+  await sp.locator('.msel__input').fill('brick');
+  await sp.waitForTimeout(400);
+  await pickRow('Brickell');
+  const brickell = await countNow();
+  check('the neighborhood picker filters the list', brickell > 0 && brickell < total, `${total} -> ${brickell} in Brickell`);
+  const allBrickell = await sp.evaluate(() =>
+    [...document.querySelectorAll('.pane:not([hidden]) .row')]
+      .slice(0, 8)
+      .every((r) => /Brickell/.test(r.textContent)),
+  );
+  check('every row is in the chosen neighborhood', allBrickell);
+  await sp.locator('.msel__clear').click();
+  await sp.waitForTimeout(400);
+  await sp.locator('.msel__done').click();
   await sp.waitForTimeout(400);
 
   // Dismissing the panel must not also activate whatever sits underneath it.

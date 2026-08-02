@@ -1,9 +1,10 @@
 /**
  * List view — the highest day-to-day value screen, so it gets the most care.
  *
- * Sticky search + a single scrolling chip row for the filters used constantly
- * (meal, tonight, price). Everything else lives in the filter sheet, so the
- * default screen stays quiet.
+ * Sticky search, then three short rows: the pickers whose values are too many to
+ * spell out (day, cuisine, neighborhood), the chips whose values are few enough
+ * to read at a glance (meal, price, Reserve, Saved), and the sort. Everything
+ * else lives in the filter sheet, so the default screen stays quiet.
  *
  * Scrolling 350 rows stays smooth via CSS `content-visibility: auto` on the row
  * itself (see .row in app.css) rather than manual windowing. Hand-rolled windowing
@@ -21,6 +22,7 @@ import {
   countActiveFilters,
   cuisineOptions,
   MEAL_OPTIONS,
+  neighborhoodOptions,
   SORTS,
 } from '../lib/filters.js';
 import { RestaurantRow } from './RestaurantRow.jsx';
@@ -30,6 +32,7 @@ import { MultiSelect } from './MultiSelect.jsx';
 import {
   IconCalendar,
   IconClose,
+  IconPin,
   IconSearch,
   IconSliders,
   IconTarget,
@@ -101,6 +104,12 @@ export function ListView() {
     [cuisines],
   );
 
+  const hoods = useMemo(() => neighborhoodOptions(restaurants), [restaurants]);
+  const hoodChoices = useMemo(
+    () => hoods.map((h) => ({ value: h.name, label: h.name, count: h.count })),
+    [hoods],
+  );
+
   // Reset scroll when the result set changes, so a new filter starts at the top.
   const resultKey = `${deferredFilters.query}|${activeCount}|${sort}`;
   useEffect(() => {
@@ -157,17 +166,17 @@ export function ListView() {
         </button>
       </header>
 
-      <div className="chiprow scroll-x">
-        {/*
-          A native <select> rather than a custom menu: seven days is exactly what
-          the platform picker is good at, it opens as a proper wheel on a phone,
-          and it's keyboard- and screen-reader-correct for free.
-        */}
-        {/*
-          Both of these are multi-select: "Thursday or Friday" and "Italian or
-          Spanish" are ordinary things to want, and the sheet already allowed
-          them — the chip row just couldn't express it.
-        */}
+      {/*
+        Three rows, each answering a different question, because one scrolling
+        strip of mixed controls meant the price chips were always just off the
+        right edge and nobody found them.
+
+        1. What am I in the mood for, in the three dimensions with too many
+           values to spell out as chips: when, what kind, where.
+        2. The short lists, which fit as chips and read faster that way.
+        3. How to order what comes back.
+      */}
+      <div className="chiprow chiprow--selects scroll-x">
         <MultiSelect
           icon={<IconCalendar width={15} height={15} className="selfilter__icon" />}
           noun="day"
@@ -188,6 +197,18 @@ export function ListView() {
           onChange={(cuisines) => setFilters((f) => ({ ...f, cuisines }))}
         />
 
+        <MultiSelect
+          icon={<IconPin width={15} height={15} className="selfilter__icon" />}
+          noun="neighborhood"
+          plural="neighborhoods"
+          emptyLabel="Anywhere"
+          options={hoodChoices}
+          selected={filters.neighborhoods}
+          onChange={(neighborhoods) => setFilters((f) => ({ ...f, neighborhoods }))}
+        />
+      </div>
+
+      <div className="chiprow scroll-x">
         {MEAL_OPTIONS.map((m) => (
           <Chip key={m.id} active={filters.meals.includes(m.id)} onClick={() => toggle('meals', m.id)}>
             {m.label}

@@ -60,16 +60,22 @@ export function ConfidenceNotice({ record }) {
 
   const isUnknown = record.geo_confidence === 'neighborhood_only' || record.geo_confidence === 'unknown';
 
+  /*
+   * One sentence, and only the one that means something to whoever is deciding
+   * where to eat.
+   *
+   * This used to carry a heading and then the resolver's own working — "sources
+   * disagree: listing_jsonld is 2846 m away", "corroborated by census_geocoder
+   * (71 m)". That is the audit trail for the pin, and it is genuinely useful, but
+   * not here: it reads as an error message about our pipeline rather than as
+   * advice about the restaurant. It still lives on the record, still appears in
+   * geocode-review.md, and still shows in Calibrate, which is where anyone who
+   * wants it is looking.
+   */
   return (
     <div className={`notice ${isUnknown ? 'notice--unknown' : 'notice--warn'}`}>
       {isUnknown ? <IconPin width={16} height={16} /> : <IconAlert width={16} height={16} />}
-      <div>
-        <strong>{meta.label}</strong>
-        <p>{meta.blurb}</p>
-        {record.geo_notes?.length > 0 && (
-          <p className="notice__detail">{record.geo_notes.join(' · ')}</p>
-        )}
-      </div>
+      <p>{meta.blurb}</p>
     </div>
   );
 }

@@ -265,6 +265,16 @@
 }
 
 /*
+ * The pickers sit on their own row, tighter to the chips below them so the two
+ * read as one filter block rather than as separate sections. They are the three
+ * dimensions with too many values to spell out as chips — 7 days, 24 cuisines,
+ * 35 neighborhoods — so each collapses to a single pill.
+ */
+.chiprow--selects {
+  padding-bottom: 6px;
+}
+
+/*
  * The filter pill that opens a checklist — shaped to match the chips beside it.
  *
  * Lifted above the dismissing backdrop (89) so it stays pressable while its own
@@ -939,10 +949,9 @@
   color: var(--ink-2);
 }
 
-.notice__detail {
-  margin-top: 4px;
-  font-size: var(--t-xs);
-  opacity: 0.85;
+/* Still used by the "you verified this pin" notice, which keeps its heading. */
+.notice strong + p {
+  margin-top: 2px;
 }
 
 /* =============================================================== buttons === */
