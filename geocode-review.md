@@ -1,6 +1,6 @@
 # Geocode Review — Miami Spice 2026 Navigator
 
-Generated 2026-08-10 · 380 records
+Generated 2026-08-17 · 380 records
 
 Sorted worst-first. Everything in sections 1-4 wants a human eye; everything below that is corroborated or address-exact and can be spot-checked instead. Each row links straight to Google Maps so verifying a pin is one tap, and every record listed here is reachable in the app's **Calibrate** queue in the same order.
 
