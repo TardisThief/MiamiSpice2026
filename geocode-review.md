@@ -1,6 +1,6 @@
 # Geocode Review — Miami Spice 2026 Navigator
 
-Generated 2026-09-07 · 401 records
+Generated 2026-09-14 · 402 records
 
 Sorted worst-first. Everything in sections 1-4 wants a human eye; everything below that is corroborated or address-exact and can be spot-checked instead. Each row links straight to Google Maps so verifying a pin is one tap, and every record listed here is reachable in the app's **Calibrate** queue in the same order.
 
@@ -9,22 +9,22 @@ Sorted worst-first. Everything in sections 1-4 wants a human eye; everything bel
 | Tier | Count | Share | Map treatment |
 |---|---:|---:|---|
 | `verified` | 0 | 0.0% | solid pin, no caveat |
-| `poi_match` | 99 | 24.7% | solid pin |
-| `address_exact` | 238 | 59.4% | solid pin |
-| `approximate` | 64 | 16.0% | hollow pin + "approximate location" |
+| `poi_match` | 97 | 24.1% | solid pin |
+| `address_exact` | 241 | 60.0% | solid pin |
+| `approximate` | 64 | 15.9% | hollow pin + "approximate location" |
 | `neighborhood_only` | 0 | 0.0% | muted pin + "exact location unknown", excluded from distance sort |
 | `unknown` | 0 | 0.0% | no pin — cannot be placed |
 
-**64** record(s) need review · **337** are solid.
+**64** record(s) need review · **338** are solid.
 
-328 of 401 coordinates were confirmed by two or more independent methods agreeing within 150 m.
+328 of 402 coordinates were confirmed by two or more independent methods agreeing within 150 m.
 
 ### Winning method
 
 | Method | Records |
 |---|---:|
-| `listing_jsonld` | 303 |
-| `overpass_poi` | 95 |
+| `listing_jsonld` | 308 |
+| `overpass_poi` | 91 |
 | `nominatim_structured` | 3 |
 
 ## 1. No coordinate at all
@@ -50,7 +50,7 @@ Ordered by how suspicious the flag is. Rendered with a hollow pin and an "approx
 | [107 Taste Asian Restaurant Coral Gables](https://www.google.com/maps/search/?api=1&query=107%20Taste%20Asian%20Restaurant%20Coral%20Gables%20357%20Alcazar%20Ave.%2C%20Coral%20Gables%2C%20FL%2C%2033134) | Coral Gables | 357 Alcazar Ave., Coral Gables, FL, 33134 | 25.75305, -80.26197 | `listing_jsonld` | `source_disagreement` | corroborated by nominatim_structured (5 m); sources disagree: overpass_poi is 3411 m away |
 | [Taikin Asian Cuisine](https://www.google.com/maps/search/?api=1&query=Taikin%20Asian%20Cuisine%207450%20NW%20104th%20Ave.%2C%20Doral%2C%20FL%2C%2033178) | Doral | 7450 NW 104th Ave., Doral, FL, 33178 | 25.84164, -80.36665 | `listing_jsonld` | `source_disagreement` | corroborated by nominatim_structured (1 m); sources disagree: overpass_poi is 3429 m away |
 | [Soya Sushi Bar](https://www.google.com/maps/search/?api=1&query=Soya%20Sushi%20Bar%2011402%20NW%2041%20St.%2C%20Doral%2C%20FL%2C%2033178) | Doral | 11402 NW 41 St., Doral, FL, 33178 | 25.81098, -80.38307 | `listing_jsonld` | `source_disagreement` | sources disagree: nominatim_structured is 653 m away |
-| [La Boulangerie Boul'Mich Doral](https://www.google.com/maps/search/?api=1&query=La%20Boulangerie%20Boul'Mich%20Doral%20690%20NW%2041st%20St.%2C%20Doral%2C%20FL%2C%2033178) | Doral | 690 NW 41st St., Doral, FL, 33178 | 25.81171, -80.35341 | `listing_jsonld` | `source_disagreement` | sources disagree: nominatim_structured is 983 m away |
+| [La Boulangerie Boul'Mich Doral](https://www.google.com/maps/search/?api=1&query=La%20Boulangerie%20Boul'Mich%20Doral%20690%20NW%2041st%20St.%2C%20Doral%2C%20FL%2C%2033178) | Doral | 690 NW 41st St., Doral, FL, 33178 | 25.81171, -80.35341 | `listing_jsonld` | `source_disagreement` | sources disagree: nominatim_structured is 1690 m away |
 | [Bunbury](https://www.google.com/maps/search/?api=1&query=Bunbury%2055%20NE%2014th%20Street%2C%20Miami%2C%20FL%2C%2033132) | Downtown Miami | 55 NE 14th Street, Miami, FL, 33132 | 25.79827, -80.19115 | `listing_jsonld` | `source_disagreement` | sources disagree: nominatim_structured is 1112 m away |
 | [Serafina](https://www.google.com/maps/search/?api=1&query=Serafina%20652%20NE%202nd%20Ave.%2C%20Miami%2C%20FL%2C%2033132) | Downtown Miami | 652 NE 2nd Ave., Miami, FL, 33132 | 25.78116, -80.19105 | `listing_jsonld` | `source_disagreement` | sources disagree: nominatim_freetext is 20296 m away |
 | [Paralia](https://www.google.com/maps/search/?api=1&query=Paralia%20The%20Ritz-Carlton%20Key%20Biscayne%2C%20Key%20Biscayne%2C%20FL%2C%2033149) | Key Biscayne | The Ritz-Carlton Key Biscayne, Key Biscayne, FL, 33149 | 25.69371, -80.16282 | `listing_jsonld` | `shared_venue_risk` `source_disagreement` | sources disagree: nominatim_structured is 538 m away |
@@ -58,7 +58,7 @@ Ordered by how suspicious the flag is. Rendered with a hollow pin and an "approx
 | [Santorini By Georgios](https://www.google.com/maps/search/?api=1&query=Santorini%20By%20Georgios%201690%20Collins%20Avenue%2C%20Miami%20Beach%2C%20FL%2C%2033139) | Miami Beach: South Beach | 1690 Collins Avenue, Miami Beach, FL, 33139 | 25.79214, -80.13023 | `listing_jsonld` | `source_disagreement` | corroborated by nominatim_structured (3 m); sources disagree: overpass_poi is 2516 m away |
 | [Bella Miami beach](https://www.google.com/maps/search/?api=1&query=Bella%20Miami%20beach%20236%2021st%20St%2C%20Miami%20Beach%2C%20FL%2C%2033139) | Miami Beach: South Beach | 236 21st St, Miami Beach, FL, 33139 | 25.78667, -80.14074 | `overpass_poi` | `source_disagreement` | sources disagree: nominatim_structured is 1555 m away; targeted second look added 1 candidate(s) |
 | [Yoso Sushi](https://www.google.com/maps/search/?api=1&query=Yoso%20Sushi%205026%20NE%202nd%20Ave.%2C%20Miami%2C%20FL%2C%2033137) | Miami Design District | 5026 NE 2nd Ave., Miami, FL, 33137 | 25.82170, -80.19214 | `listing_jsonld` | `source_disagreement` | corroborated by nominatim_structured (35 m); sources disagree: overpass_poi is 920 m away; overpass_poi is 920 m away; targeted second look added 1 candidate(s) |
-| [Beauty and The Butcher](https://www.google.com/maps/search/?api=1&query=Beauty%20and%20The%20Butcher%206915%20RED%20ROAD%2C%20Miami%2C%20FL%2C%2033143) | South Miami | 6915 RED ROAD, Miami, FL, 33143 | 25.70495, -80.28526 | `listing_jsonld` | `source_disagreement` | corroborated by overpass_poi (12 m), overpass_poi (12 m); sources disagree: nominatim_structured is 1517 m away; targeted second look added 1 candidate(s) |
+| [Beauty and The Butcher](https://www.google.com/maps/search/?api=1&query=Beauty%20and%20The%20Butcher%206915%20RED%20ROAD%2C%20Miami%2C%20FL%2C%2033143) | South Miami | 6915 RED ROAD, Miami, FL, 33143 | 25.70495, -80.28526 | `listing_jsonld` | `source_disagreement` | corroborated by overpass_poi (12 m), overpass_poi (12 m); sources disagree: nominatim_structured is 1209 m away; targeted second look added 1 candidate(s) |
 | [Old Lisbon Sunset Drive](https://www.google.com/maps/search/?api=1&query=Old%20Lisbon%20Sunset%20Drive%205837%20Sunset%20Drive%2C%20South%20Miami%2C%20FL%2C%2033143) | South Miami | 5837 Sunset Drive, South Miami, FL, 33143 | 25.70454, -80.28821 | `listing_jsonld` | `source_disagreement` | sources disagree: nominatim_structured is 1061 m away |
 | [Flight West](https://www.google.com/maps/search/?api=1&query=Flight%20West%205894%20Sunset%20Drive%2C%20South%20Miami%2C%20FL%2C%2033143) | South Miami | 5894 Sunset Drive, South Miami, FL, 33143 | 25.70411, -80.28907 | `listing_jsonld` | `source_disagreement` | sources disagree: nominatim_structured is 977 m away |
 | [La Brisa](https://www.google.com/maps/search/?api=1&query=La%20Brisa%20Miccosukee%20Resort%20%26%20Gaming%2C%20Miami%2C%20FL%2C%2033194) | Southwest Miami-Dade | Miccosukee Resort & Gaming, Miami, FL, 33194 | 25.71436, -80.61049 | `listing_jsonld` | `shared_venue_risk` `source_disagreement` `neighborhood_disagreement` | sources disagree: nominatim_structured is 13745 m away; 22.3 km from the declared Southwest Miami-Dade centroid |
@@ -75,6 +75,7 @@ Ordered by how suspicious the flag is. Rendered with a hollow pin and an "approx
 | [China Grill Bal Harbour](https://www.google.com/maps/search/?api=1&query=China%20Grill%20Bal%20Harbour%209700%20Collins%20Ave.%2C%20Bal%20Harbour%2C%20FL%2C%2033154) | Bal Harbour | 9700 Collins Ave., Bal Harbour, FL, 33154 | 25.88933, -80.12471 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (126 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [Slim's Bal Harbour](https://www.google.com/maps/search/?api=1&query=Slim's%20Bal%20Harbour%209700%20Collins%20Ave.%2C%20Miami%2C%20FL%2C%2033135) | Bal Harbour | 9700 Collins Ave., Miami, FL, 33135 | 25.88829, -80.12441 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (58 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [La Terraza Café & Bar](https://www.google.com/maps/search/?api=1&query=La%20Terraza%20Caf%C3%A9%20%26%20Bar%20JW%20Marriott%20Miami%2C%20Miami%2C%20FL%2C%2033131) | Brickell | JW Marriott Miami, Miami, FL, 33131 | 25.76264, -80.19116 | `listing_jsonld` | `shared_venue_risk` | shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
+| [Quinto](https://www.google.com/maps/search/?api=1&query=Quinto%20788%20Brickell%20Plaza%2C%205th%20Floor%2C%20Miami%2C%20FL%2C%2033131) | Brickell | 788 Brickell Plaza, 5th Floor, Miami, FL, 33131 | 25.76655, -80.19216 | `listing_jsonld` | `shared_venue_risk` | shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [Rosa Sky Rooftop](https://www.google.com/maps/search/?api=1&query=Rosa%20Sky%20Rooftop%20115%20SW%208th%20St%2C%20Miami%2C%20FL%2C%2033130) | Brickell | 115 SW 8th St, Miami, FL, 33130 | 25.76689, -80.19609 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (11 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [Tea Room](https://www.google.com/maps/search/?api=1&query=Tea%20Room%20788%20Brickell%20Plaza%2C%20Miami%2C%20FL%2C%2033131) | Brickell | 788 Brickell Plaza, Miami, FL, 33131 | 25.76667, -80.19275 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (3 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [Seia Miami](https://www.google.com/maps/search/?api=1&query=Seia%20Miami%20830%20Brickell%20Plaza%2C%20Miami%2C%20FL%2C%2033131) | Brickell | 830 Brickell Plaza, Miami, FL, 33131 | 25.76607, -80.19219 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (25 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
@@ -98,7 +99,6 @@ Ordered by how suspicious the flag is. Rendered with a hollow pin and an "approx
 | [Matador Room](https://www.google.com/maps/search/?api=1&query=Matador%20Room%20The%20Miami%20Beach%20EDITION%2C%20Miami%20Beach%2C%20FL%2C%2033140) | Miami Beach: Mid Beach | The Miami Beach EDITION, Miami Beach, FL, 33140 | 25.80515, -80.12432 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (24 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [The Strand at Carillon Miami](https://www.google.com/maps/search/?api=1&query=The%20Strand%20at%20Carillon%20Miami%206801%20Collins%20Ave.%2C%20Miami%20Beach%2C%20FL%2C%2033140) | Miami Beach: North Beach | 6801 Collins Ave., Miami Beach, FL, 33140 | 25.85285, -80.11996 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (41 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [A Fish Called Avalon](https://www.google.com/maps/search/?api=1&query=A%20Fish%20Called%20Avalon%20Avalon%20Hotel%2C%20Miami%20Beach%2C%20FL%2C%2033139) | Miami Beach: South Beach | Avalon Hotel, Miami Beach, FL, 33139 | 25.77709, -80.13171 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (15 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
-| [restaurant at the goodtime hotel](https://www.google.com/maps/search/?api=1&query=restaurant%20at%20the%20goodtime%20hotel%20601%20Washington%20Ave%2C%20Miami%20Beach%2C%20FL%2C%2033139) | Miami Beach: South Beach | 601 Washington Ave, Miami Beach, FL, 33139 | 25.77607, -80.13417 | `listing_jsonld` | `shared_venue_risk` `unreliable_poi_conflict` | corroborated by nominatim_structured (81 m); sources disagree: overpass_poi is 2670 m away; overpass_poi is 670 m away (outvoted by agreeing sources, and itself an ambiguous match); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation; targeted second look added 1 candidate(s) |
 | [Rao's Miami Beach](https://www.google.com/maps/search/?api=1&query=Rao's%20Miami%20Beach%20Loews%20Miami%20Beach%20Hotel%2C%20Miami%20Beach%2C%20FL%2C%2033139) | Miami Beach: South Beach | Loews Miami Beach Hotel, Miami Beach, FL, 33139 | 25.78960, -80.12937 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (25 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [Serena Rooftop](https://www.google.com/maps/search/?api=1&query=Serena%20Rooftop%20915%20Washington%20Avenue%2C%20Miami%20Beach%2C%20FL%2C%2033139) | Miami Beach: South Beach | 915 Washington Avenue, Miami Beach, FL, 33139 | 25.77977, -80.13288 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (14 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation |
 | [Salumeria 104](https://www.google.com/maps/search/?api=1&query=Salumeria%20104%203451%20NE%201st%20Ave.%2C%20Suite%20104%2C%20Miami%2C%20FL%2C%2033137) | Miami Design District | 3451 NE 1st Ave., Suite 104, Miami, FL, 33137 | 25.80936, -80.19194 | `listing_jsonld` | `shared_venue_risk` | corroborated by nominatim_structured (42 m); shared-address venue (hotel/mall/rooftop) without a named-POI confirmation; targeted second look added 1 candidate(s) |
